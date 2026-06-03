@@ -1,0 +1,158 @@
+@import url("tldraw/tldraw.css");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    color-scheme: dark;
+    --bg-primary: #07121f;
+    --bg-secondary: #0d1c2d;
+    --surface: rgba(15, 31, 52, 0.72);
+    --surface-strong: rgba(18, 39, 64, 0.92);
+    --text-primary: #eaf2ff;
+    --text-muted: #9db4d5;
+    --accent: #2ea8ff;
+    --accent-strong: #0c87e5;
+    --success: #39e079;
+    --danger: #ef4444;
+    --shadow-ambient: 0 30px 80px rgba(0, 0, 0, 0.35);
+    --ring: 0 0 0 2px rgba(46, 168, 255, 0.35);
+    --sb-track-color: #1e2c40;
+    --sb-thumb-color: #3d8fd1;
+    --sb-size: 8px;
+}
+
+@layer components {
+    .view-title {
+        @apply mb-3 w-full border-b border-blue-900/60 pb-2 text-start text-lg font-semibold tracking-wide;
+    }
+
+    .glass-panel {
+        @apply rounded-2xl border border-blue-400/20 bg-slate-900/60 shadow-2xl backdrop-blur-xl;
+    }
+
+    .input-modern {
+        @apply w-full rounded-xl border border-blue-300/30 bg-slate-900/80 px-4 py-3 text-slate-100 outline-none transition focus:border-blue-400 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.25)];
+    }
+
+    .btn-primary {
+        @apply rounded-xl bg-blue-500 px-4 py-2 font-semibold text-white transition hover:bg-blue-400;
+    }
+}
+
+body {
+    font-family: "Space Grotesk", sans-serif;
+    color: var(--text-primary);
+    background:
+        radial-gradient(circle at 14% 12%, rgba(56, 131, 255, 0.22), transparent 35%),
+        radial-gradient(circle at 85% 80%, rgba(29, 172, 189, 0.18), transparent 40%),
+        linear-gradient(150deg, var(--bg-primary), var(--bg-secondary));
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+* {
+    scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+    width: var(--sb-size);
+    height: var(--sb-size);
+}
+
+::-webkit-scrollbar-track {
+    background: var(--sb-track-color);
+    border-radius: 5px;
+    height: var(--sb-size);
+    width: var(--sb-size);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb-color);
+    border-radius: 5px;
+    height: var(--sb-size);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    body {
+        scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+    }
+}
+
+@keyframes up-down {
+    0% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.ambient-grid {
+    position: relative;
+}
+
+.ambient-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(93, 128, 171, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(93, 128, 171, 0.08) 1px, transparent 1px);
+    background-size: 30px 30px;
+    mask-image: radial-gradient(circle at center, black, transparent 85%);
+}
+
+/* Editor */
+
+.cm-editor {
+    max-height: 93vh;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.cm-editor .cm-scroller {
+    font-family: "Space Mono", monospace;
+}
+
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+}
+
+@media screen and (max-width: 768px) {
+    .cm-editor {
+        max-height: calc(93vh - 60px);
+    }
+
+    .cm-editor .cm-scroller {
+        min-height: calc(93vh - 60px);
+    }
+}
+
+/* Github Corner */
+
+.github-corner:hover .octo-arm {
+    animation: octocat-wave 560ms ease-in-out;
+}
+
+@keyframes octocat-wave {
+    0%,
+    100% {
+        transform: rotate(0);
+    }
+    20%,
+    60% {
+        transform: rotate(-25deg);
+    }
+    40%,
+    80% {
+        transform: rotate(10deg);
+    }
+}
