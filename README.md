@@ -100,181 +100,167 @@ git --version
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Setup
 
-### 1. Clone the Repository
+### Option 1: Quick Start from Root (Recommended)
 
-```bash
-git clone https://github.com/aurindumgit/CoCode.git
-cd CoCode
-```
-
-### 2. Install Dependencies
-
-#### Backend Setup
+From the project root:
 
 ```bash
-cd server
+# 1. Install root dependencies (for running both servers concurrently)
 npm install
+
+# 2. Install all frontend and backend dependencies
+npm run install:all
+
+# 3. Start both backend and frontend development servers together
+npm run dev
 ```
 
-#### Frontend Setup
-
-```bash
-cd ../client
-npm install
-```
+* **Frontend:** `http://localhost:5173`
+* **Backend:** `http://localhost:5000`
 
 ---
 
-## ⚙️ Environment Variables Setup
+### Option 2: Running Frontend & Backend Separately
 
-### Backend Environment Variables
+> **Important:** Both the backend and frontend servers must be running during development.
 
-Create a `.env` file in the `server/` directory:
+#### 1. Backend Server
 
-```env
-# Server Configuration
-PORT=5000
-NODE_ENV=development
+Open your first terminal:
 
-# Socket.IO Configuration
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-
-# Code Execution APIs
-JUDGE0_API_KEY=your_judge0_api_key_here
-PISTON_API_URL=https://emkc.org/api/v2
-
-# Database (if using MongoDB, etc.)
-# MONGODB_URI=your_mongodb_uri_here
-
-# CORS Settings
-CORS_ALLOW_CREDENTIALS=true
+```bash
+cd backend
+npm install
+npm run dev
 ```
 
-**API Keys to Obtain:**
+The backend server will start on `http://localhost:5000`.
 
-- **Judge0 API Key** - Sign up at [judge0.com](https://judge0.com)
-- **Piston API** - Free public API, no key needed
-- **Pollinations API** - Optional, for image generation
+#### 2. Frontend Application
 
-### Frontend Environment Variables
+Open another terminal:
 
-Create a `.env.local` file in the `client/` directory:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend application will start on `http://localhost:5173`.
+
+---
+
+## ⚙️ Environment Variables
+
+### Backend Environment Configuration (`backend/.env`)
+
+Create a `.env` file in the `backend/` directory (see [backend/.env.example](file:///c:/Users/jatin/Projects/CoCodee/backend/.env.example)):
 
 ```env
-# API Configuration
+PORT=5000
+JWT_SECRET=cocodee_jwt_secret_super_secure_key_change_in_production
+CLIENT_URL=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+# Optional Code Execution APIs
+JUDGE0_API_KEY=your_judge0_api_key_here
+PISTON_API_URL=https://emkc.org/api/v2
+```
+
+### Frontend Environment Configuration (`frontend/.env.local`)
+
+Create a `.env.local` file in the `frontend/` directory (see [frontend/.env.example](file:///c:/Users/jatin/Projects/CoCodee/frontend/.env.example)):
+
+```env
+# Centralized API & Socket URLs
+VITE_API_URL=http://localhost:5000
+VITE_SOCKET_URL=http://localhost:5000
 VITE_BACKEND_URL=http://localhost:5000
+
+# Optional Feature Flags & APIs
 VITE_JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
 VITE_JUDGE0_API_KEY=your_judge0_api_key_here
 VITE_PISTON_API_URL=https://emkc.org/api/v2
 VITE_POLLINATIONS_API_URL=https://image.pollinations.ai
-
-# Feature Flags
 VITE_ENABLE_DRAWING=true
 VITE_ENABLE_CHAT=true
 VITE_ENABLE_CODE_EXECUTION=true
 ```
 
-**Note:** For production, replace `localhost:5000` with your deployed backend URL.
+> **Note for Production:** Replace `http://localhost:5000` with your deployed backend URL.
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Architecture
 
-```
-CoCode/
-├── client/                          # Frontend application
-│   ├── src/
-│   │   ├── components/             # React components
-│   │   │   ├── editor/            # Code editor component
-│   │   │   ├── drawing/           # Drawing board
-│   │   │   ├── chats/             # Chat UI
-│   │   │   ├── sidebar/           # Sidebar with views
-│   │   │   │   └── sidebar-views/ # Individual sidebar components
-│   │   │   ├── files/             # File management UI
-│   │   │   ├── common/            # Reusable components
-│   │   │   └── connection/        # Connection status
-│   │   ├── context/               # React context for state
-│   │   │   ├── AppContext.tsx     # Global app state
-│   │   │   ├── FileContext.tsx    # File system state
-│   │   │   ├── ChatContext.tsx    # Chat state
-│   │   │   ├── RunCodeContext.tsx # Code execution state
-│   │   │   ├── SocketContext.tsx  # WebSocket state
-│   │   │   └── ViewContext.tsx    # View/route state
-│   │   ├── api/                   # API client modules
-│   │   │   ├── judge0Api.ts       # Judge0 integration
-│   │   │   ├── pistonApi.ts       # Piston API integration
-│   │   │   └── pollinationsApi.ts # Image generation API
-│   │   ├── hooks/                 # Custom React hooks
-│   │   ├── pages/                 # Page components
-│   │   ├── types/                 # TypeScript interfaces
-│   │   ├── utils/                 # Utility functions
-│   │   ├── resources/             # Static resources
-│   │   ├── styles/                # Global CSS
-│   │   ├── App.tsx                # Root component
-│   │   └── main.tsx               # Entry point
-│   ├── public/                    # Static files
-│   ├── package.json              # Frontend dependencies
-│   ├── tsconfig.json             # TypeScript config
-│   ├── vite.config.mts           # Vite config
-│   ├── tailwind.config.ts        # Tailwind CSS config
-│   └── vercel.json               # Vercel deployment config
+```text
+CoCodee/
 │
-├── server/                        # Backend application
+├── frontend/                       # React 18 + TypeScript + Vite SPA
+│   ├── public/                     # Static assets (icons, images)
 │   ├── src/
-│   │   ├── server.ts             # Main server file
-│   │   └── types/                # TypeScript interfaces
-│   ├── public/                   # Static files
-│   ├── package.json              # Server dependencies
-│   ├── tsconfig.json             # TypeScript config
-│   └── README.md                 # Server documentation
+│   │   ├── api/                    # HTTP & Auth API services
+│   │   ├── components/             # UI Components (Editor, Canvas, Navbar, Forms)
+│   │   │   ├── auth/               # Protected route guard
+│   │   │   ├── common/             # Navbar, Footer, Modal, Select
+│   │   │   ├── editor/             # Code editor components
+│   │   │   ├── drawing/            # Tldraw collaborative whiteboard
+│   │   │   ├── chats/              # Room chat components
+│   │   │   ├── sidebar/            # Sidebar views & user profile controls
+│   │   │   └── workspace/          # Collaborative workspace
+│   │   ├── config/                 # Centralized environment config (API & Socket URLs)
+│   │   ├── context/                # React Contexts (Auth, Socket, File, Chat, etc.)
+│   │   ├── hooks/                  # Custom React hooks
+│   │   ├── pages/                  # Route Pages (Home, Login, Register, Dashboard, etc.)
+│   │   ├── styles/                 # Global styles and theme tokens
+│   │   ├── types/                  # TypeScript interface definitions
+│   │   ├── App.tsx                 # Root router & route definitions
+│   │   └── main.tsx                # App entry point
+│   ├── package.json                # Frontend dependencies
+│   ├── tsconfig.json               # TypeScript config
+│   ├── vite.config.mts             # Vite bundler config
+│   └── tailwind.config.ts          # Tailwind CSS styling config
 │
-├── README.md                      # This file
-└── .gitignore                    # Git ignore rules
+├── backend/                        # Node.js + Express + TypeScript + Socket.IO
+│   ├── src/
+│   │   ├── db/                     # Data stores (UserStore with JSON persistence)
+│   │   ├── middleware/             # JWT auth middleware
+│   │   ├── routes/                 # API Routes (/api/auth)
+│   │   ├── types/                  # Backend type definitions
+│   │   └── server.ts               # Express server & Socket.IO event handler
+│   ├── data/                       # Local persistent data directory
+│   ├── package.json                # Backend dependencies
+│   ├── tsconfig.json               # TypeScript config
+│   └── .env.example                # Backend environment template
+│
+├── .gitignore                      # Monorepo-level git ignore rules
+├── package.json                    # Root scripts for running/building both apps
+└── README.md                       # Main project documentation
 ```
 
 ---
 
-## 🚀 Running the Project
+## 🚀 Building for Production
 
-### Development Mode
-
-#### Start the Backend Server
+### Build Both with Root Script
 
 ```bash
-cd server
-npm run dev
-```
-
-Server will run on `http://localhost:5000`
-
-#### Start the Frontend Development Server (in another terminal)
-
-```bash
-cd client
-npm run dev
-```
-
-Frontend will run on `http://localhost:5173`
-
-Open your browser and navigate to `http://localhost:5173`
-
-### Production Mode
-
-#### Build the Client
-
-```bash
-cd client
 npm run build
 ```
 
-This creates an optimized production build in `client/dist/`
+This compiles both `backend/` (`tsc`) and `frontend/` (`vite build`).
 
-#### Build the Server (if needed)
+### Build Individually
 
 ```bash
-cd server
+# Build Frontend
+cd frontend
+npm run build
+
+# Build Backend
+cd backend
 npm run build
 ```
 

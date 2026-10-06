@@ -1,0 +1,193 @@
+import SidebarButton from "@/components/sidebar/sidebar-views/SidebarButton"
+import { useAppContext } from "@/context/AppContext"
+import { useSocket } from "@/context/SocketContext"
+import { useViews } from "@/context/ViewContext"
+import useResponsive from "@/hooks/useResponsive"
+import useWindowDimensions from "@/hooks/useWindowDimensions"
+import { ACTIVITY_STATE } from "@/types/app"
+import { SocketEvent } from "@/types/socket"
+import { VIEWS } from "@/types/view"
+import { IoCodeSlash } from "react-icons/io5"
+import { MdOutlineDraw } from "react-icons/md"
+import { HiOutlineLogout, HiOutlineViewGrid, HiOutlineUser } from "react-icons/hi"
+import cn from "classnames"
+import { Tooltip } from "react-tooltip"
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
+import { toast } from "react-hot-toast"
+import { USER_STATUS } from "@/types/user"
+import { tooltipStyles } from "./tooltipStyles"
+
+function Sidebar() {
+    const {
+        activeView,
+        isSidebarOpen,
+        viewComponents,
+        viewIcons,
+        setIsSidebarOpen,
+    } = useViews()
+    const { minHeightReached } = useResponsive()
+    const { activityState, setActivityState, setStatus, setCurrentUser } = useAppContext()
+    const { socket } = useSocket()
+    const { isMobile } = useWindowDimensions()
+    const { user: authUser, logout } = useAuth()
+    const navigate = useNavigate()
+    const [showTooltip, setShowTooltip] = useState(true)
+
+    const handleLogout = () => {
+        if (socket && socket.connected) {
+            socket.disconnect()
+        }
+        setStatus(USER_STATUS.DISCONNECTED)
+        setCurrentUser({ username: "", roomId: "" })
+        logout()
+        toast.success("Logged out successfully.")
+        navigate("/login", { replace: true })
+    }
+
+    const changeState = () => {
+        setShowTooltip(false)
+        if (activityState === ACTIVITY_STATE.CODING) {
+            setActivityState(ACTIVITY_STATE.DRAWING)
+            socket.emit(SocketEvent.REQUEST_DRAWING)
+        } else {
+            setActivityState(ACTIVITY_STATE.CODING)
+        }
+
+        if (isMobile) {
+            setIsSidebarOpen(false)
+        }
+    }
+
+    return (
+        <aside className="flex w-full min-w-0 overflow-hidden md:h-full md:max-h-full md:min-h-full md:w-full md:min-w-0">
+            <div
+                className={cn(
+                    "fixed bottom-0 left-0 z-50 flex h-[56px] w-full items-center gap-4 self-end overflow-visible border-t border-blue-800/70 bg-slate-950/95 p-2 backdrop-blur md:static md:h-full md:w-[58px] md:min-w-[58px] md:flex-col md:border-r md:border-t-0 md:pt-4",
+                    {
+                        hidden: minHeightReached,
+                    },
+                )}
+            >
+                <SidebarButton
+                    viewName={VIEWS.FILES}
+                    icon={viewIcons[VIEWS.FILES]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.SEARCH}
+                    icon={viewIcons[VIEWS.SEARCH]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.HISTORY}
+                    icon={viewIcons[VIEWS.HISTORY]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.RUN}
+                    icon={viewIcons[VIEWS.RUN]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.COPILOT}
+                    icon={viewIcons[VIEWS.COPILOT]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.CHATS}
+                    icon={viewIcons[VIEWS.CHATS]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.ACTIVITY}
+                    icon={viewIcons[VIEWS.ACTIVITY]}
+                />
+
+                <SidebarButton
+                    viewName={VIEWS.CLIENTS}
+                    icon={viewIcons[VIEWS.CLIENTS]}
+                />
+                <SidebarButton
+                    viewName={VIEWS.SETTINGS}
+                    icon={viewIcons[VIEWS.SETTINGS]}
+                />
+
+                {/* Button to change activity state coding or drawing */}
+                <div className="flex h-fit items-center justify-center">
+                    <button
+                        className="flex items-center rounded-xl p-2 transition duration-200 ease-in-out hover:bg-blue-400/25"
+                        onClick={changeState}
+                        onMouseEnter={() => setShowTooltip(true)}
+                        data-tooltip-id="activity-state-tooltip"
+                        data-tooltip-content={
+                            activityState === ACTIVITY_STATE.CODING
+                                ? "Switch to Drawing Mode"
+                                : "Switch to Coding Mode"
+                        }
+                    >
+                        {activityState === ACTIVITY_STATE.CODING ? (
+                            <MdOutlineDraw size={30} />
+                        ) : (
+                            <IoCodeSlash size={30} />
+                        )}
+                    </button>
+                    {showTooltip && (
+                        <Tooltip
+                            id="activity-state-tooltip"
+                            place="right"
+                            offset={15}
+                            className="!z-[9999]"
+                            style={tooltipStyles}
+                            noArrow={false}
+                            positionStrategy="fixed"
+                            float={true}
+                        />
+                    )}
+                </div>
+
+                {/* User actions */}
+                <div className="my-1 hidden md:block h-[1px] w-6 bg-slate-800/80" />
+
+                <button
+                    onClick={() => navigate("/dashboard")}
+                    className="flex items-center rounded-xl p-2 transition duration-200 ease-in-out hover:bg-blue-400/25 text-slate-300 hover:text-white"
+                    title="Dashboard"
+                    aria-label="Go to Dashboard"
+                >
+                    <HiOutlineViewGrid size={22} />
+                </button>
+
+                <button
+                    onClick={() => navigate("/profile")}
+                    className="flex items-center rounded-xl p-1.5 transition duration-200 ease-in-out hover:bg-blue-400/25"
+                    title={authUser ? `Profile (${authUser.username})` : "Profile"}
+                    aria-label="User Profile"
+                >
+                    {authUser?.avatar ? (
+                        <img
+                            src={authUser.avatar}
+                            alt={authUser.username}
+                            className="h-6 w-6 rounded-lg bg-slate-800 object-cover"
+                        />
+                    ) : (
+                        <HiOutlineUser size={22} className="text-slate-300" />
+                    )}
+                </button>
+
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center rounded-xl p-2 transition duration-200 ease-in-out hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                    title="Logout"
+                    aria-label="Logout"
+                >
+                    <HiOutlineLogout size={22} />
+                </button>
+            </div>
+            <div
+                className="absolute left-0 top-0 z-20 w-full min-w-0 overflow-hidden border-r border-blue-700/20 bg-slate-950/85 backdrop-blur md:static md:flex-1"
+                style={isSidebarOpen ? {} : { display: "none" }}
+            >
+                {/* Render the active view component */}
+                {viewComponents[activeView]}
+            </div>
+        </aside>
+    )
+}
+
+export default Sidebar

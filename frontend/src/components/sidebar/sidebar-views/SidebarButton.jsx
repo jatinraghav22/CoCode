@@ -1,0 +1,57 @@
+import { useChatRoom } from "@/context/ChatContext"
+import { useViews } from "@/context/ViewContext"
+import { VIEWS } from "@/types/view"
+import { useState } from "react"
+import { Tooltip } from "react-tooltip"
+import { buttonStyles, tooltipStyles } from "../tooltipStyles"
+
+const ViewButton = ({ viewName, icon }) => {
+    const { activeView, setActiveView, isSidebarOpen, setIsSidebarOpen } =
+        useViews()
+    const { isNewMessage } = useChatRoom()
+    const [showTooltip, setShowTooltip] = useState(true)
+
+    const handleViewClick = (viewName) => {
+        if (viewName === activeView) {
+            setIsSidebarOpen(!isSidebarOpen)
+        } else {
+            setIsSidebarOpen(true)
+            setActiveView(viewName)
+        }
+    }
+
+    return (
+        <div className="relative flex flex-col items-center">
+            <button
+                onClick={() => handleViewClick(viewName)}
+                onMouseEnter={() => setShowTooltip(true)} // Show tooltip again on hover
+                className={`${buttonStyles.base} ${buttonStyles.hover} ${activeView === viewName && isSidebarOpen ? "bg-blue-400/25 text-cyan-200 ring-1 ring-blue-300/50" : "text-slate-200"}`}
+                {...(showTooltip && {
+                    "data-tooltip-id": `tooltip-${viewName}`,
+                    "data-tooltip-content": viewName,
+                })}
+            >
+                <div className="flex items-center justify-center">{icon}</div>
+                {/* Show dot for new message in chat View Button */}
+                {viewName === VIEWS.CHATS && isNewMessage && (
+                    <div className="absolute right-0 top-0 h-3 w-3 rounded-full bg-blue-500"></div>
+                )}
+            </button>
+            {/* render the tooltip */}
+            {showTooltip && (
+                <Tooltip
+                    id={`tooltip-${viewName}`}
+                    place="right"
+                    offset={25}
+                    className="!z-[9999]"
+                    style={tooltipStyles}
+                    noArrow={false}
+                    positionStrategy="fixed"
+                    float={true}
+                />
+            )}
+        </div>
+    )
+}
+
+export default ViewButton

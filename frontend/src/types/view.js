@@ -1,0 +1,13 @@
+const VIEWS = {
+    FILES: "FILES",
+    SEARCH: "SEARCH",
+    HISTORY: "HISTORY",
+    ACTIVITY: "ACTIVITY",
+    CHATS: "CHATS",
+    CLIENTS: "CLIENTS",
+    RUN: "RUN",
+    COPILOT: "COPILOT",
+    SETTINGS: "SETTINGS",
+}
+
+export { VIEWS }
