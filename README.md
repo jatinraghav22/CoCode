@@ -1,355 +1,885 @@
-# 💻 CoCode - Real-Time Collaborative Coding Platform
+# 🚀 CoCode — Real-Time Collaborative Coding Platform
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61dafb.svg)](https://vitejs.dev/)
-[![Backend](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-green.svg)](https://nodejs.org/)
-[![Socket.IO](https://img.shields.io/badge/RealTime-Socket.IO-black.svg)](https://socket.io/)
-[![Deployment](https://img.shields.io/badge/Deploy-Vercel%20%7C%20Render-black.svg)](https://render.com)
+<p align="center">
+  <b>Code Together. Collaborate in Real Time. Build Faster.</b>
+</p>
 
-**GitHub Repository:** [https://github.com/jatinraghav22/CoCode](https://github.com/jatinraghav22/CoCode)  
-**Live Frontend:** `https://your-cocode-frontend.vercel.app` *(Placeholder — update after deployment)*  
-**Live Backend:** `https://your-cocode-backend.onrender.com` *(Placeholder — update after deployment)*  
+<p align="center">
+  A modern real-time collaborative coding platform that allows developers to write, execute, discuss, and manage code together from anywhere.
+</p>
 
 ---
 
-## 🚀 Overview
+## 🌐 Live Project
 
-**CoCode** is a production-ready real-time collaborative development environment. It empowers teams, students, and interviewers to write, edit, execute code, whiteboard diagrams, and chat synchronously in shared virtual rooms without any local setup.
+### 🚀 Live Demo
 
-Whether pair-programming across continents, conducting technical interviews, or brainstorming on an infinite whiteboard canvas, **CoCode** provides a fluid, responsive, low-latency experience.
+https://co-code-ten.vercel.app/
 
----
+### ⚙️ Backend API
 
-## ✨ Features
+https://cocode-backend-6lvi.onrender.com
 
-### 🖥️ Code Editing & Workspace
-- **Multi-File Workspace:** Create, rename, edit, and organize files and nested directories in a full file explorer.
-- **CodeMirror 6 Core:** Ultra-fast code editor equipped with syntax highlighting, line numbers, bracket matching, and theme customization.
-- **Auto Language Detection:** Detects programming languages based on file extensions.
-- **Local Persistence & Export:** Download individual files or export your entire workspace as a ZIP file.
+### 💻 GitHub Repository
 
-### 👥 Real-Time Collaboration
-- **Live Collaborative Editing:** Synchronize code changes with room participants in real-time.
-- **Cursor & Presence Sync:** Track active collaborators, online/offline status, and typing indicators.
-- **Activity Timeline:** Track room events (file creation, edits, runs, user joins/leaves) in real-time.
-- **Pinned Room Notes:** Share persistent room scratchpads and announcements.
+https://github.com/jatinraghav22/CoCode
 
-### 🎨 Infinite Drawing Board
-- **Integrated Tldraw Whiteboard:** Brainstorm architectures, sketch system designs, and collaborate visually alongside your code editor.
-- **Room Canvas Synchronization:** Whiteboard drawings sync across connected room members.
+### 👨‍💻 Developer Portfolio
 
-### 💬 Built-in Room Chat
-- **Real-Time Chat:** Message collaborators directly inside your room.
-- **Message Badges & Unread Counters:** Stay alerted without interrupting your typing flow.
-
-### ▶️ Multi-Language Code Execution
-- **Multi-Tier Execution Engine:** Dual compiler support utilizing backend proxies and direct fallbacks to **Judge0** and **Piston API** (supports C++, C, Python, JavaScript, TypeScript, Java, Rust, Go, C#, PHP).
-- **Interactive Stdin / Execution Output:** Run code with custom inputs and view stdout, stderr, compile errors, and runtime stats.
-
-### 🔐 Authentication & Session Security
-- **JWT Authentication:** Secure user registration, login, profile updates, and token verification.
-- **Password Protection:** Encrypted passwords via bcrypt hashing.
-- **Client Session Management:** Persistent login sessions with remember-me capability.
+https://jatinraghav.vercel.app/
 
 ---
 
-## 🛠️ Technology Stack
+# 📌 About CoCode
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Frontend Framework** | React 18, Vite 6 |
-| **Frontend Styling** | TailwindCSS, PostCSS, Framer Motion |
-| **Code Editor** | CodeMirror 6 (`@uiw/react-codemirror`), Themes & Extensions |
-| **Drawing Board** | Tldraw 2.1 |
-| **Real-time Client** | Socket.IO Client 4.7 |
-| **HTTP Client** | Axios |
-| **Backend Runtime** | Node.js (ES Modules, Node 18+) |
-| **Backend Server** | Express 4.21 |
-| **Real-time Server** | Socket.IO 4.7 |
-| **Security & Auth** | JSON Web Tokens (`jsonwebtoken`), `bcryptjs`, `cors`, `dotenv` |
-| **Data Storage** | Built-in JSON Store with atomic persistence (`backend/data/users.json`) |
-| **Execution Engines** | Judge0 API, Piston API |
+**CoCode** is a real-time collaborative coding platform designed for developers, students, and teams who want to work together on programming projects.
+
+The platform provides a shared coding environment where users can:
+
+* 👥 Collaborate in real time
+* 💻 Write and edit code
+* 📁 Manage multiple files
+* ▶️ Execute code
+* 💬 Communicate through chat
+* 🎨 Collaborate using a drawing board
+* 👀 See active users and presence
+* 🕒 Track coding activity
+* 🔖 Create and manage pinned notes
+* 🔄 Maintain code/version history
+* 🌐 Work from anywhere through the deployed web application
+
+CoCode combines coding, communication, collaboration, and execution into one unified real-time workspace.
 
 ---
 
-## 📁 Repository Structure
+# ✨ Key Features
+
+## 🔐 Authentication
+
+* User registration
+* Secure login
+* Logout functionality
+* Protected application routes
+* User session management
+
+---
+
+## 🏠 Dashboard
+
+After successful authentication, users can access the main dashboard.
+
+### Dashboard Navigation
+
+```text
+Dashboard
+├── Compiler
+├── Create Room
+├── Join Room
+├── User Profile
+└── Logout
+```
+
+The dashboard provides quick access to both personal coding and collaborative features.
+
+---
+
+# 💻 Personal Compiler
+
+CoCode provides a personal compiler environment where users can write and execute code without creating or joining a collaboration room.
+
+### Features
+
+* Code editor
+* Programming language selection
+* Code execution
+* Input/output handling
+* Compilation result
+* Error output
+* Independent coding environment
+
+The compiler can be used separately from collaborative rooms.
+
+---
+
+# 👥 Real-Time Collaboration
+
+Users can create or join collaborative coding rooms.
+
+### Create Room
+
+A user can create a new room and share the room ID with other users.
+
+### Join Room
+
+Other users can join an existing room using the room ID.
+
+### Collaboration Features
+
+* Real-time code synchronization
+* Multiple users
+* User presence
+* Shared files
+* Real-time communication
+* Shared drawing board
+* Activity tracking
+* Version management
+
+---
+
+# 📝 Collaborative Code Editor
+
+CoCode provides a shared coding workspace where multiple users can work together.
+
+Users can:
+
+* Create files
+* Edit files
+* Switch between files
+* Synchronize changes
+* Work on code simultaneously
+* Manage different programming languages
+
+Changes are synchronized in real time using **Socket.IO**.
+
+---
+
+# 📂 Multi-File Workspace
+
+The platform supports a multi-file coding environment.
+
+Users can:
+
+* Create new files
+* Open files
+* Edit files
+* Switch between files
+* Manage project files
+* Collaborate on multiple files
+
+This makes the workspace suitable for larger coding projects rather than a single-file compiler.
+
+---
+
+# ▶️ Code Execution
+
+CoCode supports online code execution through external compiler/execution APIs.
+
+Users can:
+
+1. Select a programming language
+2. Write code
+3. Provide input
+4. Run the code
+5. View output
+6. View compilation/runtime errors
+
+The platform is designed to support execution across multiple programming languages.
+
+---
+
+# 💬 Real-Time Chat
+
+Each collaborative workspace can be used for communication between team members.
+
+Users can:
+
+* Send messages
+* Receive messages in real time
+* Discuss code
+* Share ideas
+* Coordinate development work
+
+---
+
+# 🎨 Collaborative Drawing Board
+
+CoCode includes a collaborative drawing/whiteboard environment.
+
+It can be used for:
+
+* Flowcharts
+* System architecture
+* Algorithms
+* Diagrams
+* Project planning
+* Explaining concepts
+
+Users can visually communicate ideas while working together.
+
+---
+
+# 👀 User Presence
+
+The platform provides real-time awareness of users inside a collaboration room.
+
+Users can see who is currently participating in the workspace.
+
+This makes collaboration more interactive and similar to working together in a shared physical environment.
+
+---
+
+# 🕒 Activity Timeline
+
+CoCode can maintain activity information related to collaborative work.
+
+Examples include:
+
+* User joined
+* User left
+* File changes
+* Collaboration activity
+* Room activity
+
+This helps users understand what is happening inside the workspace.
+
+---
+
+# 📌 Pinned Notes
+
+Users can maintain important notes inside the collaborative environment.
+
+Pinned notes can be used for:
+
+* Important instructions
+* Tasks
+* Meeting notes
+* Coding reminders
+* Project requirements
+
+---
+
+# 🔄 Version Management
+
+CoCode provides functionality for maintaining different versions of coding work.
+
+This helps users:
+
+* Track previous changes
+* Maintain coding history
+* Restore previous work
+* Manage development progress
+
+---
+
+# 🎨 User Interface
+
+The application focuses on a modern developer-oriented interface with:
+
+* Responsive layout
+* Dark developer-friendly interface
+* Modern code editor
+* Interactive collaboration workspace
+* Real-time UI updates
+* Dashboard-based navigation
+
+---
+
+# 🛠️ Technology Stack
+
+## Frontend
+
+* React
+* Vite
+* JavaScript / JSX
+* CodeMirror
+* Tailwind CSS
+* Socket.IO Client
+* Tldraw
+
+## Backend
+
+* Node.js
+* Express.js
+* Socket.IO
+* JWT Authentication
+* REST APIs
+
+## Code Execution
+
+* External online compiler/execution APIs
+* Judge0-compatible execution architecture
+
+## Deployment
+
+* Vercel — Frontend
+* Render — Backend
+
+## Development Tools
+
+* Git
+* GitHub
+* VS Code
+* npm
+
+---
+
+# 🏗️ Project Architecture
+
+```text
+                    ┌─────────────────────┐
+                    │       User          │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   Vercel Frontend   │
+                    │      React + Vite   │
+                    └──────────┬──────────┘
+                               │
+                  ┌────────────┴────────────┐
+                  │                         │
+                  ▼                         ▼
+        ┌──────────────────┐      ┌──────────────────┐
+        │    REST APIs     │      │    Socket.IO     │
+        │     Backend      │      │ Real-Time Sync   │
+        └────────┬─────────┘      └────────┬─────────┘
+                 │                         │
+                 └────────────┬────────────┘
+                              ▼
+                    ┌─────────────────────┐
+                    │  Render Backend     │
+                    │ Node + Express      │
+                    └──────────┬──────────┘
+                               │
+                ┌──────────────┼──────────────┐
+                │              │              │
+                ▼              ▼              ▼
+          Authentication   Room Data     Code Execution
+```
+
+---
+
+# 📁 Project Structure
 
 ```text
 CoCode/
-├── frontend/                  # React 18 + Vite frontend
-│   ├── public/                # Static assets, favicon, etc.
-│   ├── src/
-│   │   ├── api/               # Auth & code execution API clients
-│   │   ├── components/        # Editor, whiteboard, chat, modals, file tree
-│   │   ├── config/            # Centralized environment configuration (env.js)
-│   │   ├── context/           # Socket, Auth, File, App, Chat state contexts
-│   │   ├── hooks/             # Custom responsive & context menu hooks
-│   │   ├── pages/             # Home, Editor, Login, Register, Profile pages
-│   │   ├── types/             # Socket and user constants
-│   │   ├── App.jsx            # Application router
-│   │   └── main.jsx           # React DOM root entry
-│   ├── .env.example           # Frontend environment variable template
-│   ├── index.html             # HTML entry template
-│   ├── package.json           # Frontend dependencies and scripts
-│   ├── vercel.json            # Vercel SPA routing rewrite rules
-│   └── vite.config.js         # Vite configuration with chunk splitting
 │
-├── backend/                   # Node.js + Express + Socket.IO backend
-│   ├── data/                  # Runtime user data store (git-ignored)
-│   ├── public/                # Landing index.html page
+├── backend/
 │   ├── src/
-│   │   ├── db/                # User storage provider (userStore.js)
-│   │   ├── middleware/        # JWT authentication middleware
-│   │   ├── routes/            # Auth & compiler execution routes
-│   │   ├── types/             # Socket event and user status definitions
-│   │   └── server.js          # Express server, Socket.IO handlers, /health check
-│   ├── .env.example           # Backend environment variable template
-│   ├── .gitignore             # Backend gitignore rules
-│   └── package.json           # Backend dependencies and scripts
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   └── server.js
+│   │
+│   ├── data/
+│   ├── package.json
+│   └── .env.example
 │
-├── .env.example               # Unified monorepo environment template
-├── .gitignore                 # Root gitignore rules
-├── package.json               # Root scripts for running/building both workspaces
-├── render.yaml                # Render Blueprint deployment specification
-├── vercel.json                # Root Vercel configuration for SPA builds
-└── README.md                  # Comprehensive documentation
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── context/
+│   │   ├── config/
+│   │   └── App.jsx
+│   │
+│   ├── public/
+│   ├── package.json
+│   └── .env.example
+│
+├── render.yaml
+├── vercel.json
+├── .gitignore
+└── README.md
 ```
 
 ---
 
-## ⚙️ Environment Variables
+# ⚙️ Environment Variables
 
-### Root / Unified Reference (`.env.example`)
+## Frontend
 
-Copy the template to your environment or configure these keys in your deployment platform:
+Create:
+
+```text
+frontend/.env
+```
+
+Add:
 
 ```env
-# Backend Configuration
-NODE_ENV=production
-PORT=10000
-JWT_SECRET=your_super_secret_jwt_key_here
-FRONTEND_URL=https://your-frontend.vercel.app
-CLIENT_URL=https://your-frontend.vercel.app
-CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
-
-# Optional: External Database URL
-DATABASE_URL=
-
-# Frontend Configuration (Vite)
-VITE_API_URL=https://your-backend.onrender.com
-VITE_SOCKET_URL=https://your-backend.onrender.com
-VITE_BACKEND_URL=https://your-backend.onrender.com
+VITE_API_URL=https://cocode-backend-6lvi.onrender.com
+VITE_SOCKET_URL=https://cocode-backend-6lvi.onrender.com
 ```
-
-### Backend Variables (`backend/.env`)
-
-| Variable | Required | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `PORT` | No | `5000` | Port to bind. Cloud platforms (Render, Railway) automatically inject `$PORT`. |
-| `NODE_ENV` | No | `development` | Runtime mode (`development` or `production`). |
-| `JWT_SECRET` | **Yes (Prod)** | Default fallback | Cryptographic secret for signing and verifying JWT tokens. |
-| `FRONTEND_URL` | **Yes (Prod)** | `http://localhost:5173` | Allowed production frontend origin for CORS and WebSocket handshake. |
-| `CLIENT_URL` | No | `http://localhost:5173` | Alias for `FRONTEND_URL`. |
-| `CORS_ORIGINS` | No | — | Comma-separated list of allowed origins. |
-| `DATABASE_URL` | No | — | Optional connection string for external databases. |
-| `JUDGE0_URL` | No | `https://ce.judge0.com` | Custom or self-hosted Judge0 instance URL. |
-| `JUDGE0_API_KEY` | No | — | RapidAPI key if using paid Judge0 tier. |
-
-### Frontend Variables (`frontend/.env.local` or Vercel Environment Variables)
-
-| Variable | Required | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `VITE_API_URL` | **Yes (Prod)** | `http://localhost:5000` (in dev) | Deployed backend REST API base URL. |
-| `VITE_SOCKET_URL` | No | `VITE_API_URL` | Deployed backend Socket.IO base URL. |
-| `VITE_BACKEND_URL` | No | `VITE_API_URL` | Alias fallback for `VITE_API_URL`. |
-| `VITE_PISTON_URL` | No | `https://emkc.org/api/v2/piston` | Direct Piston API fallback URL. |
 
 ---
 
-## 💻 Local Development Setup
+## Backend
 
-### 1. Prerequisites
-- **Node.js** 18.0.0 or higher
-- **npm** 9.0.0 or higher
-- **Git**
+Create:
 
-Verify your environment:
-```bash
-node -v
-npm -v
+```text
+backend/.env
 ```
 
-### 2. Clone Repository
+Add:
+
+```env
+NODE_ENV=production
+PORT=10000
+
+JWT_SECRET=your_secure_secret
+
+FRONTEND_URL=https://co-code-ten.vercel.app
+CORS_ORIGINS=https://co-code-ten.vercel.app
+```
+
+### ⚠️ Security
+
+Never upload the following to GitHub:
+
+```text
+.env
+API keys
+Passwords
+JWT secrets
+Private credentials
+Database credentials
+```
+
+Use `.env.example` files for public configuration examples.
+
+---
+
+# 💻 Run CoCode Locally
+
+## 1. Clone Repository
+
 ```bash
 git clone https://github.com/jatinraghav22/CoCode.git
+```
+
+Move into the project:
+
+```bash
 cd CoCode
 ```
 
-### 3. Install Dependencies
-Install all root, backend, and frontend dependencies in one command:
+---
+
+# 🔧 Backend Setup
+
+Open a terminal:
+
 ```bash
-npm run install:all
+cd backend
 ```
 
-### 4. Configure Local Environment
-Set up backend environment:
+Install dependencies:
+
 ```bash
-cp backend/.env.example backend/.env
+npm install
 ```
 
-Set up frontend environment:
-```bash
-cp frontend/.env.example frontend/.env.local
+Create your environment file:
+
+```text
+.env
 ```
 
-### 5. Start Development Servers
-Run both backend and frontend concurrently:
+Configure the required environment variables.
+
+Start the backend:
+
+```bash
+npm start
+```
+
+The backend will start using the configured port.
+
+---
+
+# 🎨 Frontend Setup
+
+Open another terminal:
+
+```bash
+cd frontend
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create:
+
+```text
+.env
+```
+
+Add:
+
+```env
+VITE_API_URL=http://localhost:YOUR_BACKEND_PORT
+VITE_SOCKET_URL=http://localhost:YOUR_BACKEND_PORT
+```
+
+Start the frontend:
+
 ```bash
 npm run dev
 ```
 
-- **Frontend App:** [http://localhost:5173](http://localhost:5173)
-- **Backend API:** [http://localhost:5000](http://localhost:5000)
-- **Health Check:** [http://localhost:5000/health](http://localhost:5000/health)
+Vite will provide the local development URL in the terminal.
 
 ---
 
-## 🚢 Production Deployment
+# 🚀 Deployment
 
-The architecture separates the application into a decoupled **Frontend SPA** (optimized for global edge CDNs like Vercel) and a **Backend Web Service** with WebSocket persistence (optimized for platforms like Render).
+CoCode uses a separated deployment architecture.
 
 ```text
-                  ┌──────────────────────────────────────────────┐
-                  │             User Web Browser                 │
-                  └──────────────┬───────────────────────────────┘
-                                 │
-                   HTTPS Requests│WebSocket Connections
-                                 ▼
-         ┌───────────────────────────────┐     ┌───────────────────────────────┐
-         │       Frontend (Vercel)       │     │       Backend (Render)        │
-         │  - Static React 18 SPA        │     │  - Express REST API           │
-         │  - Vite Bundle via Global CDN │────▶│  - Socket.IO WebSockets       │
-         │  - SPA Routing (/rewrites)    │     │  - JWT Auth + User Store      │
-         │                               │     │  - Health Check: GET /health  │
-         └───────────────────────────────┘     └───────────────┬───────────────┘
-                                                               │
-                                                               ▼
-                                               ┌───────────────────────────────┐
-                                               │   Judge0 / Piston Compilers   │
-                                               │   (External Code Runners)     │
-                                               └───────────────────────────────┘
+Frontend
+   ↓
+Vercel
+   ↓
+React + Vite
+
+Backend
+   ↓
+Render
+   ↓
+Node.js + Express + Socket.IO
 ```
 
 ---
 
-### Step A: Deploy Backend to Render
+# ☁️ Frontend Deployment — Vercel
 
-1. Log in to your [Render Dashboard](https://dashboard.render.com/).
-2. Click **New +** ➔ **Web Service**.
-3. Connect your GitHub repository: `https://github.com/jatinraghav22/CoCode`.
-4. Configure the Web Service settings:
-   - **Name:** `cocode-backend` (or your preferred name)
-   - **Region:** Choose the region nearest to you (e.g., Oregon, Frankfurt, Singapore)
-   - **Root Directory:** `backend`
-   - **Runtime:** `Node`
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-   - **Instance Type:** `Free`
-5. Click **Advanced** and set the **Health Check Path**:
-   - `/health`
-6. Under **Environment Variables**, add:
-   ```text
-   NODE_ENV = production
-   PORT = 10000
-   JWT_SECRET = <Generate a strong random 32+ character string>
-   FRONTEND_URL = https://your-cocode-frontend.vercel.app
-   CORS_ORIGINS = https://your-cocode-frontend.vercel.app
-   ```
-   *(Note: You can fill in the temporary placeholder or update `FRONTEND_URL` once your Vercel URL is created).*
-7. Click **Create Web Service**.
-8. Once deployed, copy your backend URL (e.g. `https://cocode-backend.onrender.com`).
-9. Verify the backend health:
-   ```bash
-   curl https://your-cocode-backend.onrender.com/health
-   # Expected output: {"status":"ok","uptime":...}
-   ```
+The frontend is deployed using Vercel.
 
-> **Automated Render Blueprint:** Alternatively, Render will detect the included `render.yaml` file at the root of the repository, enabling 1-click Blueprints deployment.
+### Configuration
 
----
+```text
+Framework:
+Vite
 
-### Step B: Deploy Frontend to Vercel
+Root Directory:
+frontend
 
-1. Log in to your [Vercel Dashboard](https://vercel.com/dashboard).
-2. Click **Add New...** ➔ **Project**.
-3. Import the repository: `jatinraghav22/CoCode`.
-4. Configure the Project:
-   - **Framework Preset:** `Vite`
-   - **Root Directory:** Click `Edit` and select `frontend` (or leave as root; the included root `vercel.json` supports both).
-   - **Build Command:** `npm run build` (or `vite build`)
-   - **Output Directory:** `dist`
-5. Under **Environment Variables**, configure:
-   ```text
-   VITE_API_URL = https://your-cocode-backend.onrender.com
-   VITE_SOCKET_URL = https://your-cocode-backend.onrender.com
-   ```
-   *(Ensure there is no trailing slash in the URL).*
-6. Click **Deploy**.
-7. Once deployment finishes, copy your live frontend domain (e.g. `https://cocode-frontend.vercel.app`).
-8. Return to your Render backend dashboard and ensure `FRONTEND_URL` and `CORS_ORIGINS` match your live Vercel domain.
+Build Command:
+npm run build
 
----
-
-## 🗄️ Database & Storage Architecture
-
-### Default Store (Out-of-the-Box)
-- The application includes an autonomous file-backed JSON user store located at `backend/data/users.json`.
-- It initializes automatically upon first launch and provides persistent user registration and password hashing.
-- `backend/data/*.json` is excluded from git version control via `.gitignore` to safeguard user privacy.
-
-### Migrating to an External Database (MongoDB / PostgreSQL)
-If scaling to multiple server replicas or stateless serverless containers:
-1. Provide a `DATABASE_URL` in `backend/.env`.
-2. Connect your preferred ORM (e.g., Mongoose, Prisma, or TypeORM) inside `backend/src/db/`.
-3. The existing query methods in `backend/src/db/userStore.js` (`createUser`, `findUserByEmail`, `findUserById`, `updateUser`) can be cleanly replaced without touching routes or UI components.
-
----
-
-## 🔌 Socket.IO Production Configuration
-
-CoCode relies on low-latency bidirectional WebSocket communication:
-
-- **Transports:** Supports both native `websocket` and HTTP `polling` fallback for maximum firewall and proxy compatibility.
-- **Connection Handshake:** Automatic origin verification against `FRONTEND_URL` and `CORS_ORIGINS`.
-- **Reconnection Engine:** Configured with exponential backoff (`reconnectionAttempts: 10`, `reconnectionDelay: 1000ms`, `reconnectionDelayMax: 5000ms`) to gracefully handle server restarts or cold boots on free tiers.
-- **Buffer Capacity:** `maxHttpBufferSize: 1e8` (100MB) to seamlessly handle real-time sync of large source code files and Tldraw canvas snapshots.
-
----
-
-## 🧪 Build & Verification Commands
-
-### Test Frontend Production Build Locally
-```bash
-npm run build:frontend
+Output Directory:
+dist
 ```
 
-### Test Backend Startup Locally
-```bash
-npm run build:backend
-npm run start
-```
+### Environment Variables
 
-### Verify Endpoints
-```bash
-# Health Check
-curl http://localhost:5000/health
-
-# Available Compilers
-curl http://localhost:5000/api/languages
+```env
+VITE_API_URL=https://cocode-backend-6lvi.onrender.com
+VITE_SOCKET_URL=https://cocode-backend-6lvi.onrender.com
 ```
 
 ---
 
-## 📄 License
+# ☁️ Backend Deployment — Render
 
-This project is licensed under the [MIT License](LICENSE).
+The backend is deployed using Render.
+
+### Configuration
+
+```text
+Root Directory:
+backend
+
+Runtime:
+Node
+
+Build Command:
+npm install
+
+Start Command:
+npm start
+```
+
+### Environment Variables
+
+```env
+NODE_ENV=production
+PORT=10000
+JWT_SECRET=your_secure_secret
+FRONTEND_URL=https://co-code-ten.vercel.app
+CORS_ORIGINS=https://co-code-ten.vercel.app
+```
+
+---
+
+# ❤️ Health Check
+
+The backend provides a health-check endpoint:
+
+```text
+/health
+```
+
+This can be used to verify that the backend service is running correctly.
+
+---
+
+# 🔌 Real-Time Communication
+
+CoCode uses **Socket.IO** for real-time communication.
+
+Socket connections are used for features such as:
+
+* Collaborative editing
+* User presence
+* Chat
+* Drawing synchronization
+* Room updates
+* Real-time activity
+
+The production configuration supports:
+
+```text
+WebSocket
++
+Polling fallback
+```
+
+with automatic reconnection support.
+
+---
+
+# 🔐 Authentication Flow
+
+```text
+User
+ │
+ ▼
+Register / Login
+ │
+ ▼
+Authentication
+ │
+ ▼
+JWT Token
+ │
+ ▼
+Protected Routes
+ │
+ ▼
+Dashboard
+ │
+ ├── Compiler
+ ├── Create Room
+ └── Join Room
+```
+
+---
+
+# 👥 Collaboration Flow
+
+```text
+User A
+   │
+   ├── Create Room
+   │
+   ▼
+ Room ID
+   │
+   ├───────────────┐
+   │               │
+   ▼               ▼
+User B           User C
+Join Room        Join Room
+   │               │
+   └───────┬───────┘
+           ▼
+    Shared Workspace
+           │
+     ┌─────┼─────┐
+     ▼     ▼     ▼
+   Code   Chat  Drawing
+     │
+     ▼
+Real-Time Synchronization
+```
+
+---
+
+# 🧪 Testing Checklist
+
+Before production deployment, verify:
+
+* [ ] User registration
+* [ ] User login
+* [ ] Logout
+* [ ] Protected routes
+* [ ] Dashboard
+* [ ] Personal compiler
+* [ ] Create room
+* [ ] Join room
+* [ ] Real-time code synchronization
+* [ ] Multiple files
+* [ ] Chat
+* [ ] Drawing board
+* [ ] User presence
+* [ ] Activity timeline
+* [ ] Version management
+* [ ] Code execution
+* [ ] Production API connection
+* [ ] Socket.IO connection
+* [ ] CORS configuration
+* [ ] Responsive UI
+
+---
+
+# 🐛 Troubleshooting
+
+## API Error
+
+If the frontend cannot communicate with the backend, verify:
+
+```env
+VITE_API_URL
+```
+
+and make sure it points to the deployed backend.
+
+---
+
+## Socket Connection Error
+
+Verify:
+
+```env
+VITE_SOCKET_URL
+```
+
+and backend:
+
+```env
+FRONTEND_URL
+CORS_ORIGINS
+```
+
+Both should contain the correct production frontend URL.
+
+---
+
+## CORS Error
+
+Make sure the backend allows the exact frontend origin.
+
+Example:
+
+```env
+FRONTEND_URL=https://co-code-ten.vercel.app
+CORS_ORIGINS=https://co-code-ten.vercel.app
+```
+
+Do not add unnecessary trailing slashes if the application expects the origin without one.
+
+---
+
+# 📊 Project Highlights
+
+| Feature              | Status |
+| -------------------- | ------ |
+| Authentication       | ✅      |
+| Dashboard            | ✅      |
+| Personal Compiler    | ✅      |
+| Collaborative Rooms  | ✅      |
+| Real-Time Editing    | ✅      |
+| Multi-File Workspace | ✅      |
+| Code Execution       | ✅      |
+| Real-Time Chat       | ✅      |
+| Drawing Board        | ✅      |
+| User Presence        | ✅      |
+| Activity Timeline    | ✅      |
+| Pinned Notes         | ✅      |
+| Version Management   | ✅      |
+| Responsive UI        | ✅      |
+| Vercel Deployment    | ✅      |
+| Render Deployment    | ✅      |
+
+---
+
+# 🎯 Use Cases
+
+CoCode can be useful for:
+
+* 👨‍💻 Pair programming
+* 👥 Team development
+* 🎓 Student projects
+* 🧑‍🏫 Coding classes
+* 💻 Coding interviews
+* 🏆 Hackathons
+* 📚 Learning programming
+* 🌐 Remote collaboration
+
+---
+
+# 🚀 Future Improvements
+
+Planned improvements may include:
+
+* Advanced project management
+* More programming languages
+* Improved code execution
+* File upload/download
+* Git integration
+* Team workspaces
+* Advanced permissions
+* Voice/video communication
+* AI-powered coding assistance
+* Code suggestions
+* Improved version control
+* Cloud project storage
+
+---
+
+# 👨‍💻 Developer
+
+## Jatin Raghav
+
+**B.Tech Computer Science & Engineering**
+
+Interested in:
+
+* Software Engineering
+* Full Stack Development
+* Real-Time Applications
+* Cloud Computing
+* Data Structures & Algorithms
+* Modern Web Technologies
+
+### Connect With Me
+
+**GitHub:**
+https://github.com/jatinraghav22
+
+**LinkedIn:**
+https://www.linkedin.com/in/jatin-raghav-a9a060357/
+
+**Portfolio:**
+https://jatinraghav.vercel.app/
+
+---
+
+# ⭐ Support
+
+If you find **CoCode** useful, consider giving the repository a ⭐ on GitHub.
+
+Your feedback and suggestions are always welcome.
+
+---
+
+# 📄 License
+
+This project is created for educational, development, and portfolio purposes.
+
+---
+
+<p align="center">
+  <b>Built with ❤️ by Jatin Raghav</b>
+</p>
+
+<p align="center">
+  🚀 Code Together • Build Together • Learn Together
+</p>
