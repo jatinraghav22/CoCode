@@ -1,425 +1,355 @@
-# 💻 CoCode - Code Together
+# 💻 CoCode - Real-Time Collaborative Coding Platform
 
-**[🌐 Live Demo](https://cocode-dyd7.onrender.com)**
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61dafb.svg)](https://vitejs.dev/)
+[![Backend](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-green.svg)](https://nodejs.org/)
+[![Socket.IO](https://img.shields.io/badge/RealTime-Socket.IO-black.svg)](https://socket.io/)
+[![Deployment](https://img.shields.io/badge/Deploy-Vercel%20%7C%20Render-black.svg)](https://render.com)
+
+**GitHub Repository:** [https://github.com/jatinraghav22/CoCode](https://github.com/jatinraghav22/CoCode)  
+**Live Frontend:** `https://your-cocode-frontend.vercel.app` *(Placeholder — update after deployment)*  
+**Live Backend:** `https://your-cocode-backend.onrender.com` *(Placeholder — update after deployment)*  
 
 ---
 
 ## 🚀 Overview
 
-**CoCode** is a real-time collaborative code editor that allows multiple users to **write ✍️, edit 🧠, draw 🎨, and chat 💬 simultaneously** in the same workspace. It brings the experience of **pair programming, remote interviews, and group collaboration** right into your browser — no setup needed! 🌐
+**CoCode** is a production-ready real-time collaborative development environment. It empowers teams, students, and interviewers to write, edit, execute code, whiteboard diagrams, and chat synchronously in shared virtual rooms without any local setup.
 
-Whether you're conducting technical interviews, pair programming with teammates, or collaborating on coding projects, **CoCode** provides a seamless, feature-rich environment for real-time code collaboration.
+Whether pair-programming across continents, conducting technical interviews, or brainstorming on an infinite whiteboard canvas, **CoCode** provides a fluid, responsive, low-latency experience.
 
 ---
 
 ## ✨ Features
 
-### Core Editing
+### 🖥️ Code Editing & Workspace
+- **Multi-File Workspace:** Create, rename, edit, and organize files and nested directories in a full file explorer.
+- **CodeMirror 6 Core:** Ultra-fast code editor equipped with syntax highlighting, line numbers, bracket matching, and theme customization.
+- **Auto Language Detection:** Detects programming languages based on file extensions.
+- **Local Persistence & Export:** Download individual files or export your entire workspace as a ZIP file.
 
-- ⚡ **Real-time Collaborative Code Editing** with live cursor position sync
-- 🖊️ **Syntax Highlighting** with Monaco Editor (50+ languages supported)
-- 📝 **Multiple File Editor** with tabs and file management
-- 🎨 **Collaborative Drawing Board** for sketching and diagrams
-- 📁 **Complete File System** - Create, rename, delete files and folders
+### 👥 Real-Time Collaboration
+- **Live Collaborative Editing:** Synchronize code changes with room participants in real-time.
+- **Cursor & Presence Sync:** Track active collaborators, online/offline status, and typing indicators.
+- **Activity Timeline:** Track room events (file creation, edits, runs, user joins/leaves) in real-time.
+- **Pinned Room Notes:** Share persistent room scratchpads and announcements.
 
-### Collaboration & Communication
+### 🎨 Infinite Drawing Board
+- **Integrated Tldraw Whiteboard:** Brainstorm architectures, sketch system designs, and collaborate visually alongside your code editor.
+- **Room Canvas Synchronization:** Whiteboard drawings sync across connected room members.
 
-- 💬 **Built-in Chat System** with real-time messaging
-- 👥 **Live User Presence** showing who's online, typing, and editing
-- 🔔 **Real-time Activity Timeline** tracking all room events
-- 📌 **Pinned Room Notes** for sharing important information
-- 🏷️ **Join by Room ID** - Easy sharing and access
+### 💬 Built-in Room Chat
+- **Real-Time Chat:** Message collaborators directly inside your room.
+- **Message Badges & Unread Counters:** Stay alerted without interrupting your typing flow.
 
-### Code Execution & Management
+### ▶️ Multi-Language Code Execution
+- **Multi-Tier Execution Engine:** Dual compiler support utilizing backend proxies and direct fallbacks to **Judge0** and **Piston API** (supports C++, C, Python, JavaScript, TypeScript, Java, Rust, Go, C#, PHP).
+- **Interactive Stdin / Execution Output:** Run code with custom inputs and view stdout, stderr, compile errors, and runtime stats.
 
-- ▶️ **Code Execution** - Run code in 50+ languages via Judge0 API
-- 📜 **Run History** - Store and re-run previous executions
-- 📚 **Version History** - Track file changes with snapshot snapshots and restore
-- 🕐 **Execution History** - Keep logs of all code runs
-- ⚙️ **Automatic Language Detection** based on file extensions
-
-### Customization & UX
-
-- 🎚️ **Theme Switching** - Light and dark mode support
-- 🌍 **Language Switching** - Multiple UI language support
-- 📱 **Fully Responsive Design** - Works on desktop, tablet, and mobile
-- ⚡ **Optimized Performance** - Fast load times and smooth interactions
-- 🔍 **Advanced Search** - Search files and content with highlighting
-
-### Infrastructure
-
-- 🔗 **Real-time WebSocket Communication** via Socket.IO
-- 🛠️ **Modern Tech Stack** - React, TypeScript, Tailwind CSS
-- 📦 **Production Ready** - Deployable to Vercel and Render
-- 🔐 **Room-based Access Control** - Private collaboration spaces
+### 🔐 Authentication & Session Security
+- **JWT Authentication:** Secure user registration, login, profile updates, and token verification.
+- **Password Protection:** Encrypted passwords via bcrypt hashing.
+- **Client Session Management:** Persistent login sessions with remember-me capability.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Technology Stack
 
-### Frontend
-
-- **React 18** - UI framework
-- **TypeScript** - Type-safe JavaScript
-- **Vite** - Lightning-fast build tool
-- **Tailwind CSS** - Utility-first CSS framework
-- **Monaco Editor** - Advanced code editor
-- **Socket.IO Client** - Real-time communication
-- **Axios** - HTTP client for API calls
-
-### Backend
-
-- **Node.js** - Runtime environment
-- **Express** - Web framework (via Socket.IO)
-- **Socket.IO** - WebSocket communication
-- **TypeScript** - Type-safe backend code
-
-### External APIs
-
-- **Judge0 API** - Code execution for 50+ languages
-- **Piston API** - Alternative code execution engine
-- **Pollinations API** - Image generation (optional)
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend Framework** | React 18, Vite 6 |
+| **Frontend Styling** | TailwindCSS, PostCSS, Framer Motion |
+| **Code Editor** | CodeMirror 6 (`@uiw/react-codemirror`), Themes & Extensions |
+| **Drawing Board** | Tldraw 2.1 |
+| **Real-time Client** | Socket.IO Client 4.7 |
+| **HTTP Client** | Axios |
+| **Backend Runtime** | Node.js (ES Modules, Node 18+) |
+| **Backend Server** | Express 4.21 |
+| **Real-time Server** | Socket.IO 4.7 |
+| **Security & Auth** | JSON Web Tokens (`jsonwebtoken`), `bcryptjs`, `cors`, `dotenv` |
+| **Data Storage** | Built-in JSON Store with atomic persistence (`backend/data/users.json`) |
+| **Execution Engines** | Judge0 API, Piston API |
 
 ---
 
-## 📋 Prerequisites
+## 📁 Repository Structure
 
-Before you begin, ensure you have the following installed:
-
-- **Node.js** (v16 or higher) - [Download](https://nodejs.org/)
-- **npm** (v8 or higher) - Comes with Node.js
-- **Git** - [Download](https://git-scm.com/)
-
-Verify installation:
-
-```bash
-node --version  # Should be v16+
-npm --version   # Should be v8+
-git --version
+```text
+CoCode/
+├── frontend/                  # React 18 + Vite frontend
+│   ├── public/                # Static assets, favicon, etc.
+│   ├── src/
+│   │   ├── api/               # Auth & code execution API clients
+│   │   ├── components/        # Editor, whiteboard, chat, modals, file tree
+│   │   ├── config/            # Centralized environment configuration (env.js)
+│   │   ├── context/           # Socket, Auth, File, App, Chat state contexts
+│   │   ├── hooks/             # Custom responsive & context menu hooks
+│   │   ├── pages/             # Home, Editor, Login, Register, Profile pages
+│   │   ├── types/             # Socket and user constants
+│   │   ├── App.jsx            # Application router
+│   │   └── main.jsx           # React DOM root entry
+│   ├── .env.example           # Frontend environment variable template
+│   ├── index.html             # HTML entry template
+│   ├── package.json           # Frontend dependencies and scripts
+│   ├── vercel.json            # Vercel SPA routing rewrite rules
+│   └── vite.config.js         # Vite configuration with chunk splitting
+│
+├── backend/                   # Node.js + Express + Socket.IO backend
+│   ├── data/                  # Runtime user data store (git-ignored)
+│   ├── public/                # Landing index.html page
+│   ├── src/
+│   │   ├── db/                # User storage provider (userStore.js)
+│   │   ├── middleware/        # JWT authentication middleware
+│   │   ├── routes/            # Auth & compiler execution routes
+│   │   ├── types/             # Socket event and user status definitions
+│   │   └── server.js          # Express server, Socket.IO handlers, /health check
+│   ├── .env.example           # Backend environment variable template
+│   ├── .gitignore             # Backend gitignore rules
+│   └── package.json           # Backend dependencies and scripts
+│
+├── .env.example               # Unified monorepo environment template
+├── .gitignore                 # Root gitignore rules
+├── package.json               # Root scripts for running/building both workspaces
+├── render.yaml                # Render Blueprint deployment specification
+├── vercel.json                # Root Vercel configuration for SPA builds
+└── README.md                  # Comprehensive documentation
 ```
-
----
-
-## 📦 Installation & Setup
-
-### Option 1: Quick Start from Root (Recommended)
-
-From the project root:
-
-```bash
-# 1. Install root dependencies (for running both servers concurrently)
-npm install
-
-# 2. Install all frontend and backend dependencies
-npm run install:all
-
-# 3. Start both backend and frontend development servers together
-npm run dev
-```
-
-* **Frontend:** `http://localhost:5173`
-* **Backend:** `http://localhost:5000`
-
----
-
-### Option 2: Running Frontend & Backend Separately
-
-> **Important:** Both the backend and frontend servers must be running during development.
-
-#### 1. Backend Server
-
-Open your first terminal:
-
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-The backend server will start on `http://localhost:5000`.
-
-#### 2. Frontend Application
-
-Open another terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend application will start on `http://localhost:5173`.
 
 ---
 
 ## ⚙️ Environment Variables
 
-### Backend Environment Configuration (`backend/.env`)
+### Root / Unified Reference (`.env.example`)
 
-Create a `.env` file in the `backend/` directory (see [backend/.env.example](file:///c:/Users/jatin/Projects/CoCodee/backend/.env.example)):
-
-```env
-PORT=5000
-JWT_SECRET=cocodee_jwt_secret_super_secure_key_change_in_production
-CLIENT_URL=http://localhost:5173
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-
-# Optional Code Execution APIs
-JUDGE0_API_KEY=your_judge0_api_key_here
-PISTON_API_URL=https://emkc.org/api/v2
-```
-
-### Frontend Environment Configuration (`frontend/.env.local`)
-
-Create a `.env.local` file in the `frontend/` directory (see [frontend/.env.example](file:///c:/Users/jatin/Projects/CoCodee/frontend/.env.example)):
+Copy the template to your environment or configure these keys in your deployment platform:
 
 ```env
-# Centralized API & Socket URLs
-VITE_API_URL=http://localhost:5000
-VITE_SOCKET_URL=http://localhost:5000
-VITE_BACKEND_URL=http://localhost:5000
+# Backend Configuration
+NODE_ENV=production
+PORT=10000
+JWT_SECRET=your_super_secret_jwt_key_here
+FRONTEND_URL=https://your-frontend.vercel.app
+CLIENT_URL=https://your-frontend.vercel.app
+CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
 
-# Optional Feature Flags & APIs
-VITE_JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
-VITE_JUDGE0_API_KEY=your_judge0_api_key_here
-VITE_PISTON_API_URL=https://emkc.org/api/v2
-VITE_POLLINATIONS_API_URL=https://image.pollinations.ai
-VITE_ENABLE_DRAWING=true
-VITE_ENABLE_CHAT=true
-VITE_ENABLE_CODE_EXECUTION=true
+# Optional: External Database URL
+DATABASE_URL=
+
+# Frontend Configuration (Vite)
+VITE_API_URL=https://your-backend.onrender.com
+VITE_SOCKET_URL=https://your-backend.onrender.com
+VITE_BACKEND_URL=https://your-backend.onrender.com
 ```
 
-> **Note for Production:** Replace `http://localhost:5000` with your deployed backend URL.
+### Backend Variables (`backend/.env`)
+
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `PORT` | No | `5000` | Port to bind. Cloud platforms (Render, Railway) automatically inject `$PORT`. |
+| `NODE_ENV` | No | `development` | Runtime mode (`development` or `production`). |
+| `JWT_SECRET` | **Yes (Prod)** | Default fallback | Cryptographic secret for signing and verifying JWT tokens. |
+| `FRONTEND_URL` | **Yes (Prod)** | `http://localhost:5173` | Allowed production frontend origin for CORS and WebSocket handshake. |
+| `CLIENT_URL` | No | `http://localhost:5173` | Alias for `FRONTEND_URL`. |
+| `CORS_ORIGINS` | No | — | Comma-separated list of allowed origins. |
+| `DATABASE_URL` | No | — | Optional connection string for external databases. |
+| `JUDGE0_URL` | No | `https://ce.judge0.com` | Custom or self-hosted Judge0 instance URL. |
+| `JUDGE0_API_KEY` | No | — | RapidAPI key if using paid Judge0 tier. |
+
+### Frontend Variables (`frontend/.env.local` or Vercel Environment Variables)
+
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `VITE_API_URL` | **Yes (Prod)** | `http://localhost:5000` (in dev) | Deployed backend REST API base URL. |
+| `VITE_SOCKET_URL` | No | `VITE_API_URL` | Deployed backend Socket.IO base URL. |
+| `VITE_BACKEND_URL` | No | `VITE_API_URL` | Alias fallback for `VITE_API_URL`. |
+| `VITE_PISTON_URL` | No | `https://emkc.org/api/v2/piston` | Direct Piston API fallback URL. |
 
 ---
 
-## 📁 Project Architecture
+## 💻 Local Development Setup
+
+### 1. Prerequisites
+- **Node.js** 18.0.0 or higher
+- **npm** 9.0.0 or higher
+- **Git**
+
+Verify your environment:
+```bash
+node -v
+npm -v
+```
+
+### 2. Clone Repository
+```bash
+git clone https://github.com/jatinraghav22/CoCode.git
+cd CoCode
+```
+
+### 3. Install Dependencies
+Install all root, backend, and frontend dependencies in one command:
+```bash
+npm run install:all
+```
+
+### 4. Configure Local Environment
+Set up backend environment:
+```bash
+cp backend/.env.example backend/.env
+```
+
+Set up frontend environment:
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+### 5. Start Development Servers
+Run both backend and frontend concurrently:
+```bash
+npm run dev
+```
+
+- **Frontend App:** [http://localhost:5173](http://localhost:5173)
+- **Backend API:** [http://localhost:5000](http://localhost:5000)
+- **Health Check:** [http://localhost:5000/health](http://localhost:5000/health)
+
+---
+
+## 🚢 Production Deployment
+
+The architecture separates the application into a decoupled **Frontend SPA** (optimized for global edge CDNs like Vercel) and a **Backend Web Service** with WebSocket persistence (optimized for platforms like Render).
 
 ```text
-CoCodee/
-│
-├── frontend/                       # React 18 + TypeScript + Vite SPA
-│   ├── public/                     # Static assets (icons, images)
-│   ├── src/
-│   │   ├── api/                    # HTTP & Auth API services
-│   │   ├── components/             # UI Components (Editor, Canvas, Navbar, Forms)
-│   │   │   ├── auth/               # Protected route guard
-│   │   │   ├── common/             # Navbar, Footer, Modal, Select
-│   │   │   ├── editor/             # Code editor components
-│   │   │   ├── drawing/            # Tldraw collaborative whiteboard
-│   │   │   ├── chats/              # Room chat components
-│   │   │   ├── sidebar/            # Sidebar views & user profile controls
-│   │   │   └── workspace/          # Collaborative workspace
-│   │   ├── config/                 # Centralized environment config (API & Socket URLs)
-│   │   ├── context/                # React Contexts (Auth, Socket, File, Chat, etc.)
-│   │   ├── hooks/                  # Custom React hooks
-│   │   ├── pages/                  # Route Pages (Home, Login, Register, Dashboard, etc.)
-│   │   ├── styles/                 # Global styles and theme tokens
-│   │   ├── types/                  # TypeScript interface definitions
-│   │   ├── App.tsx                 # Root router & route definitions
-│   │   └── main.tsx                # App entry point
-│   ├── package.json                # Frontend dependencies
-│   ├── tsconfig.json               # TypeScript config
-│   ├── vite.config.mts             # Vite bundler config
-│   └── tailwind.config.ts          # Tailwind CSS styling config
-│
-├── backend/                        # Node.js + Express + TypeScript + Socket.IO
-│   ├── src/
-│   │   ├── db/                     # Data stores (UserStore with JSON persistence)
-│   │   ├── middleware/             # JWT auth middleware
-│   │   ├── routes/                 # API Routes (/api/auth)
-│   │   ├── types/                  # Backend type definitions
-│   │   └── server.ts               # Express server & Socket.IO event handler
-│   ├── data/                       # Local persistent data directory
-│   ├── package.json                # Backend dependencies
-│   ├── tsconfig.json               # TypeScript config
-│   └── .env.example                # Backend environment template
-│
-├── .gitignore                      # Monorepo-level git ignore rules
-├── package.json                    # Root scripts for running/building both apps
-└── README.md                       # Main project documentation
+                  ┌──────────────────────────────────────────────┐
+                  │             User Web Browser                 │
+                  └──────────────┬───────────────────────────────┘
+                                 │
+                   HTTPS Requests│WebSocket Connections
+                                 ▼
+         ┌───────────────────────────────┐     ┌───────────────────────────────┐
+         │       Frontend (Vercel)       │     │       Backend (Render)        │
+         │  - Static React 18 SPA        │     │  - Express REST API           │
+         │  - Vite Bundle via Global CDN │────▶│  - Socket.IO WebSockets       │
+         │  - SPA Routing (/rewrites)    │     │  - JWT Auth + User Store      │
+         │                               │     │  - Health Check: GET /health  │
+         └───────────────────────────────┘     └───────────────┬───────────────┘
+                                                               │
+                                                               ▼
+                                               ┌───────────────────────────────┐
+                                               │   Judge0 / Piston Compilers   │
+                                               │   (External Code Runners)     │
+                                               └───────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Building for Production
+### Step A: Deploy Backend to Render
 
-### Build Both with Root Script
+1. Log in to your [Render Dashboard](https://dashboard.render.com/).
+2. Click **New +** ➔ **Web Service**.
+3. Connect your GitHub repository: `https://github.com/jatinraghav22/CoCode`.
+4. Configure the Web Service settings:
+   - **Name:** `cocode-backend` (or your preferred name)
+   - **Region:** Choose the region nearest to you (e.g., Oregon, Frankfurt, Singapore)
+   - **Root Directory:** `backend`
+   - **Runtime:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+   - **Instance Type:** `Free`
+5. Click **Advanced** and set the **Health Check Path**:
+   - `/health`
+6. Under **Environment Variables**, add:
+   ```text
+   NODE_ENV = production
+   PORT = 10000
+   JWT_SECRET = <Generate a strong random 32+ character string>
+   FRONTEND_URL = https://your-cocode-frontend.vercel.app
+   CORS_ORIGINS = https://your-cocode-frontend.vercel.app
+   ```
+   *(Note: You can fill in the temporary placeholder or update `FRONTEND_URL` once your Vercel URL is created).*
+7. Click **Create Web Service**.
+8. Once deployed, copy your backend URL (e.g. `https://cocode-backend.onrender.com`).
+9. Verify the backend health:
+   ```bash
+   curl https://your-cocode-backend.onrender.com/health
+   # Expected output: {"status":"ok","uptime":...}
+   ```
 
+> **Automated Render Blueprint:** Alternatively, Render will detect the included `render.yaml` file at the root of the repository, enabling 1-click Blueprints deployment.
+
+---
+
+### Step B: Deploy Frontend to Vercel
+
+1. Log in to your [Vercel Dashboard](https://vercel.com/dashboard).
+2. Click **Add New...** ➔ **Project**.
+3. Import the repository: `jatinraghav22/CoCode`.
+4. Configure the Project:
+   - **Framework Preset:** `Vite`
+   - **Root Directory:** Click `Edit` and select `frontend` (or leave as root; the included root `vercel.json` supports both).
+   - **Build Command:** `npm run build` (or `vite build`)
+   - **Output Directory:** `dist`
+5. Under **Environment Variables**, configure:
+   ```text
+   VITE_API_URL = https://your-cocode-backend.onrender.com
+   VITE_SOCKET_URL = https://your-cocode-backend.onrender.com
+   ```
+   *(Ensure there is no trailing slash in the URL).*
+6. Click **Deploy**.
+7. Once deployment finishes, copy your live frontend domain (e.g. `https://cocode-frontend.vercel.app`).
+8. Return to your Render backend dashboard and ensure `FRONTEND_URL` and `CORS_ORIGINS` match your live Vercel domain.
+
+---
+
+## 🗄️ Database & Storage Architecture
+
+### Default Store (Out-of-the-Box)
+- The application includes an autonomous file-backed JSON user store located at `backend/data/users.json`.
+- It initializes automatically upon first launch and provides persistent user registration and password hashing.
+- `backend/data/*.json` is excluded from git version control via `.gitignore` to safeguard user privacy.
+
+### Migrating to an External Database (MongoDB / PostgreSQL)
+If scaling to multiple server replicas or stateless serverless containers:
+1. Provide a `DATABASE_URL` in `backend/.env`.
+2. Connect your preferred ORM (e.g., Mongoose, Prisma, or TypeORM) inside `backend/src/db/`.
+3. The existing query methods in `backend/src/db/userStore.js` (`createUser`, `findUserByEmail`, `findUserById`, `updateUser`) can be cleanly replaced without touching routes or UI components.
+
+---
+
+## 🔌 Socket.IO Production Configuration
+
+CoCode relies on low-latency bidirectional WebSocket communication:
+
+- **Transports:** Supports both native `websocket` and HTTP `polling` fallback for maximum firewall and proxy compatibility.
+- **Connection Handshake:** Automatic origin verification against `FRONTEND_URL` and `CORS_ORIGINS`.
+- **Reconnection Engine:** Configured with exponential backoff (`reconnectionAttempts: 10`, `reconnectionDelay: 1000ms`, `reconnectionDelayMax: 5000ms`) to gracefully handle server restarts or cold boots on free tiers.
+- **Buffer Capacity:** `maxHttpBufferSize: 1e8` (100MB) to seamlessly handle real-time sync of large source code files and Tldraw canvas snapshots.
+
+---
+
+## 🧪 Build & Verification Commands
+
+### Test Frontend Production Build Locally
 ```bash
-npm run build
+npm run build:frontend
 ```
 
-This compiles both `backend/` (`tsc`) and `frontend/` (`vite build`).
-
-### Build Individually
-
+### Test Backend Startup Locally
 ```bash
-# Build Frontend
-cd frontend
-npm run build
-
-# Build Backend
-cd backend
-npm run build
+npm run build:backend
+npm run start
 ```
 
-#### Run Production Build
-
+### Verify Endpoints
 ```bash
-# Backend
-cd server
-npm start
+# Health Check
+curl http://localhost:5000/health
 
-# Frontend
-cd client
-npm run preview
+# Available Compilers
+curl http://localhost:5000/api/languages
 ```
-
----
-
-## 🏗️ Architecture Overview
-
-### Real-time Communication Flow
-
-```
-User A (Client)
-    ↓ (Socket.IO Event)
-    ↓ (Emit: FILE_UPDATE, CODE_EXECUTED, USER_TYPING, etc.)
-Server (Node.js + Socket.IO)
-    ↓ (Broadcast to room)
-    ↓ (Emit: FILE_UPDATED, ACTIVITY, etc.)
-User B, C, ... (Clients)
-    ↓ (Update local state via Context)
-    ↓ (React re-renders with new data)
-UI Updates in Real-time
-```
-
-### Component Hierarchy
-
-```
-App (AppProvider wrapper)
-├── EditorPage / HomePage
-│   ├── Sidebar
-│   │   └── SidebarView (multiple views: Editor, Chat, History, Activity, etc.)
-│   ├── Editor (Monaco Editor with Tabs)
-│   ├── DrawingEditor
-│   ├── ChatComponent
-│   └── ...
-```
-
-### State Management
-
-Each feature has its own Context:
-
-- **FileContext** - File tree, open files, version history
-- **ChatContext** - Messages, pinned notes
-- **RunCodeContext** - Code execution history
-- **AppContext** - Global app state, room activity
-- **SocketContext** - WebSocket connection state
-- **ViewContext** - Current active view
-
----
-
-## 🔌 Socket.IO Events
-
-### Client → Server (Emit)
-
-| Event              | Payload                        | Purpose             |
-| ------------------ | ------------------------------ | ------------------- |
-| `FILE_CREATE`    | `{path, content}`            | Create new file     |
-| `FILE_UPDATE`    | `{fileId, content}`          | Update file content |
-| `FILE_RENAME`    | `{fileId, newName, oldName}` | Rename file         |
-| `FILE_DELETE`    | `{fileId}`                   | Delete file         |
-| `CODE_EXECUTION` | `{code, language}`           | Execute code        |
-| `CHAT_MESSAGE`   | `{text, userId}`             | Send chat message   |
-| `USER_TYPING`    | `{typing: boolean}`          | Typing indicator    |
-
-### Server → Client (Broadcast)
-
-| Event               | Payload               | Purpose                 |
-| ------------------- | --------------------- | ----------------------- |
-| `FILE_UPDATED`    | `{fileId, content}` | New file change         |
-| `CODE_EXECUTED`   | `{output, result}`  | Code execution result   |
-| `ROOM_ACTIVITY`   | `{activity[]}`      | Activity timeline entry |
-| `PINNED_NOTE_SET` | `{text}`            | Pinned note updated     |
-| `USER_ACTIVITY`   | `{userId, status}`  | User status change      |
-
----
-
-## 🌐 Deployment
-
-### Frontend Deployment (Vercel)
-
-1. Push code to GitHub
-2. Connect repository to Vercel
-3. Set environment variables in Vercel dashboard:
-   ```
-   VITE_BACKEND_URL=your_backend_url
-   VITE_JUDGE0_API_KEY=your_key
-   ```
-4. Deploy with `npm run build`
-
-### Backend Deployment (Render)
-
-1. Push code to GitHub
-2. Create new Web Service on Render
-3. Set Build & Start commands:
-   ```
-   Build: npm install && npm run build
-   Start: npm start
-   ```
-4. Set environment variables in Render dashboard
-5. Deploy
-
-**Update Frontend:** After deploying backend, update `VITE_BACKEND_URL` in frontend to point to your Render URL.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. **Fork the repository**
-
-   ```bash
-   git clone https://github.com/yourusername/CoCode.git
-   ```
-2. **Create a feature branch**
-
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes** and commit
-
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-4. **Push to your fork**
-
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-5. **Open a Pull Request** with a clear description
-
-### Development Guidelines
-
-- Write clean, readable code with comments
-- Follow existing code style and patterns
-- Test changes locally before submitting PR
-- Update documentation if adding new features
-- Use TypeScript for all new code
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
-✨ **Give this project a ⭐ if you found it helpful!** ✨
-
-Made with 💛 for developers, by developers.
-
-</div>
+This project is licensed under the [MIT License](LICENSE).

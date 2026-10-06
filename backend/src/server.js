@@ -22,37 +22,83 @@ const PUBLIC_DIR = path.join(__dirname, "..", "public")
 app.use(express.static(PUBLIC_DIR)) // Serve static files
 
 const server = http.createServer(app)
+
 const defaultAllowedOrigins = [
 	"http://localhost:5173",
 	"http://127.0.0.1:5173",
 	"http://localhost:3000",
 	"http://localhost:5000",
-	"https://cocode-by-auri.onrender.com",
 ]
 
-const envOrigins = [
-	...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim()) : []),
-	...(process.env.CLIENT_URL ? [process.env.CLIENT_URL.trim()] : []),
+const normalizeOrigin = (o) => (o ? o.trim().replace(/\/+$/, "") : "")
+
+const rawEnvOrigins = [
+	...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",").map(normalizeOrigin) : []),
+	...(process.env.FRONTEND_URL ? [normalizeOrigin(process.env.FRONTEND_URL)] : []),
+	...(process.env.CLIENT_URL ? [normalizeOrigin(process.env.CLIENT_URL)] : []),
 ].filter(Boolean)
 
-const allowedOrigins =
-	envOrigins.length > 0
-		? Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]))
-		: defaultAllowedOrigins
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...rawEnvOrigins]))
+
+const isOriginAllowed = (origin) => {
+	if (!origin) return true
+
+	const cleanOrigin = normalizeOrigin(origin)
+	if (allowedOrigins.includes(cleanOrigin)) return true
+
+	if (process.env.NODE_ENV !== "production") {
+		if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
+			return true
+		}
+	}
+
+	for (const pattern of allowedOrigins) {
+		if (pattern.startsWith("*.")) {
+			const rootDomain = pattern.slice(2)
+			try {
+				const originHost = new URL(cleanOrigin).hostname
+				if (originHost.endsWith(`.${rootDomain}`) || originHost === rootDomain) {
+					return true
+				}
+			} catch {
+				// Ignore invalid URL format
+			}
+		}
+	}
+
+	return false
+}
+
+const corsOriginDelegate = (origin, callback) => {
+	if (isOriginAllowed(origin)) {
+		callback(null, true)
+	} else {
+		callback(null, false)
+	}
+}
 
 app.use(cors({
-	origin: allowedOrigins,
+	origin: corsOriginDelegate,
 	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 	allowedHeaders: ["Content-Type", "Authorization"],
 	credentials: true,
 }))
+
+// Health check endpoint for deployment monitoring
+app.get("/health", (_req, res) => {
+	res.status(200).json({
+		status: "ok",
+		uptime: Math.floor(process.uptime()),
+		timestamp: new Date().toISOString(),
+	})
+})
 
 app.use("/api/auth", authRoutes)
 app.use("/api", executeRoutes)
 
 const io = new Server(server, {
   cors: {
-		origin: allowedOrigins,
+		origin: corsOriginDelegate,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -479,5 +525,5 @@ app.get("/", (req, res) => {
 })
 
 server.listen(PORT, () => {
-	console.log(`Listening on port ${PORT}`)
+	console.log(`Server listening on port ${PORT} [${process.env.NODE_ENV || "development"}]`)
 })

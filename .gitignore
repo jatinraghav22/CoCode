@@ -11,6 +11,8 @@ build/
 # Environment configurations
 .env
 .env.*
+.env.local
+.env.production
 *.local
 !.env.example
 !*/.env.example

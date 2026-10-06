@@ -37,8 +37,12 @@ const SocketProvider = ({ children }) => {
     } = useAppContext()
     const socket = useMemo(
         () =>
-            io(SOCKET_URL, {
-                reconnectionAttempts: 2,
+            io(SOCKET_URL || (typeof window !== "undefined" ? window.location.origin : ""), {
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 20000,
+                transports: ["websocket", "polling"],
             }),
         [],
     )
