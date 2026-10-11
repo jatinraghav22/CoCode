@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String             @id @default(uuid())
+  email        String             @unique
+  username     String             @unique
+  name         String
+  password     String
+  avatar       String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  projects     Project[]
+  createdRooms CollaborationRoom[] @relation("RoomCreator")
+  roomMembers  RoomMember[]
+  messages     Message[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Project {
+  id          String             @id @default(uuid())
+  title       String
+  description String?
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  files       ProjectFile[]
+  versions    ProjectVersion[]
+  rooms       CollaborationRoom[]
+
+  @@index([userId])
+}
+
+model ProjectFile {
+  id        String        @id @default(uuid())
+  name      String
+  path      String        // Unique path within project e.g. "/src/App.jsx"
+  content   String        @db.LongText
+  language  String        @default("javascript")
+  isFolder  Boolean       @default(false)
+  parentId  String?
+  parent    ProjectFile?  @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  ProjectFile[] @relation("FolderChildren")
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@index([parentId])
+}
+
+model CollaborationRoom {
+  id          String       @id @default(uuid())
+  roomCode    String       @unique // Shareable code (e.g. "cocode-8924")
+  name        String
+  description String?
+  creatorId   String
+  creator     User         @relation("RoomCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  whiteboard  String?      @db.LongText // Canvas drawings snapshot
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  members     RoomMember[]
+  messages    Message[]
+
+  @@index([roomCode])
+  @@index([creatorId])
+  @@index([projectId])
+}
+
+model RoomMember {
+  id        String            @id @default(uuid())
+  roomId    String
+  room      CollaborationRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String            @default("MEMBER") // ADMIN, MEMBER, VIEWER
+  joinedAt  DateTime          @default(now())
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+}
+
+model Message {
+  id        String            @id @default(uuid())
+  content   String            @db.Text
+  roomId    String
+  room      CollaborationRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+
+  @@index([roomId])
+  @@index([userId])
+}
+
+model ProjectVersion {
+  id          String   @id @default(uuid())
+  name        String   // Snapshot version label or description
+  snapshot    String   @db.LongText // JSON serialized snapshot of files
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([projectId])
+}
