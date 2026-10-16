@@ -127,7 +127,7 @@ function App() {
 
         <nav className={`site-nav ${menuOpen ? "is-open" : ""}`}>
           <a href="#features" onClick={closeMenu}>Features</a>
-          <a href="#compiler-preview" onClick={closeMenu}>Compiler</a>
+          <a href="/compiler" onClick={closeMenu}>Compiler</a>
           <a href="#workflow" onClick={closeMenu}>How it works</a>
           <a href="#rooms" onClick={closeMenu}>Collaboration</a>
         </nav>
