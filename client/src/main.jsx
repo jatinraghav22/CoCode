@@ -17,6 +17,7 @@ import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import RoomPage from "./pages/RoomPage.jsx";
 import Settings from "./pages/Settings.jsx";
+import Profile from "./pages/Profile.jsx";
 import { ThemeProvider } from "./ThemeContext.jsx";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -84,20 +85,38 @@ createRoot(document.getElementById("root")).render(
               }
             />
 
-            {/* Protected Settings & Profile */}
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
+            {/* Dedicated Protected Profile Page */}
             <Route
               path="/profile"
               element={
                 <ProtectedRoute>
-                  <Settings />
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected Settings & Edit Profile Pages */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings defaultTab="profile" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/profile"
+              element={
+                <ProtectedRoute>
+                  <Settings defaultTab="profile" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/appearance"
+              element={
+                <ProtectedRoute>
+                  <Settings defaultTab="appearance" />
                 </ProtectedRoute>
               }
             />

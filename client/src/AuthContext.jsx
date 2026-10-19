@@ -135,6 +135,53 @@ export function AuthProvider({ children }) {
     setToken(null);
   }
 
+  async function updateProfile(profileData) {
+    if (!token) {
+      return { success: false, error: "Authentication required to update profile." };
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/user/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to update profile." };
+      }
+
+      setUser(data.profile);
+      return { success: true, profile: data.profile, message: data.message };
+    } catch {
+      return {
+        success: false,
+        error: "Unable to reach server. Please check your connection.",
+      };
+    }
+  }
+
+  async function refreshProfile() {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${API_BASE}/api/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.profile);
+        return data.profile;
+      }
+    } catch {
+      // Ignore
+    }
+    return null;
+  }
+
   // Quick helper for demo testing
   async function demoLogin() {
     return login("demo@cocode.dev", "password123");
@@ -148,6 +195,8 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateProfile,
+    refreshProfile,
     demoLogin,
   };
 

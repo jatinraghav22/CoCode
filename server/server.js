@@ -50,28 +50,64 @@ const usersByEmail = new Map(); // email.toLowerCase() -> id
 const sessions = new Map(); // token -> { userId, expiresAt }
 const rooms = new Map(); // code -> room object
 
-// Seed Demo User
+// Seed Demo User (matches reference image: Jatin Raghav)
 const DEMO_USER_ID = "user-demo-01";
 const demoUser = {
     id: DEMO_USER_ID,
-    name: "Demo Developer",
-    email: "demo@cocode.dev",
+    name: "Jatin Raghav",
+    username: "jatin-raghav",
+    email: "jatinraghav22@gmail.com",
+    phone: "+91 9876543210",
+    location: "Ghaziabad, India",
+    bio: "Full Stack Developer • Cloud Computing Enthusiast • DSA in C++",
+    role: "User",
+    memberSince: "Oct 2025",
+    skills: ["C++", "Python", "JavaScript", "HTML", "CSS", "React.js", "Node.js", "MongoDB", "Git/GitHub"],
+    socialLinks: {
+        github: "jatinraghav22",
+        linkedin: "jatin-raghav-a9a060357",
+        portfolio: "https://jatinraghav.vercel.app/",
+    },
+    avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
     passwordHash: hashPassword("password123"),
-    createdAt: Date.now(),
+    createdAt: Date.now() - 365 * 24 * 60 * 60 * 1000,
 };
 users.set(DEMO_USER_ID, demoUser);
 usersByEmail.set(demoUser.email.toLowerCase(), DEMO_USER_ID);
+usersByEmail.set("demo@cocode.dev", DEMO_USER_ID); // alias so demo@cocode.dev also logs in as Jatin Raghav!
 
 // Seed a sample active room
 rooms.set("DEMO01", {
     code: "DEMO01",
     name: "Public Hackathon Room",
     hostId: DEMO_USER_ID,
-    hostName: "Demo Developer",
+    hostName: "Jatin Raghav",
     isPrivate: false,
     createdAt: Date.now(),
-    members: ["Demo Developer"],
+    members: ["Jatin Raghav"],
 });
+
+function formatUserProfile(user) {
+    return {
+        id: user.id,
+        name: user.name,
+        username: user.username || user.name.toLowerCase().replace(/\s+/g, "-"),
+        email: user.email,
+        phone: typeof user.phone === "string" ? user.phone : "",
+        location: typeof user.location === "string" ? user.location : "",
+        bio: typeof user.bio === "string" ? user.bio : "",
+        role: user.role || "User",
+        memberSince: user.memberSince || (user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "Recently"),
+        skills: Array.isArray(user.skills) ? user.skills : [],
+        socialLinks: user.socialLinks || {
+            github: "",
+            linkedin: "",
+            portfolio: "",
+        },
+        avatarUrl: user.avatarUrl || "",
+        createdAt: user.createdAt,
+    };
+}
 
 // Middleware: Require Real Authentication via Bearer Token
 function requireAuth(req, res, next) {
@@ -100,7 +136,7 @@ function requireAuth(req, res, next) {
         });
     }
 
-    req.user = { id: user.id, name: user.name, email: user.email };
+    req.user = formatUserProfile(user);
     req.token = token;
     next();
 }
@@ -178,7 +214,7 @@ app.post("/api/auth/register", (req, res) => {
     return res.status(201).json({
         message: "Account created successfully.",
         token,
-        user: { id: newUser.id, name: newUser.name, email: newUser.email },
+        user: formatUserProfile(newUser),
     });
 });
 
@@ -210,7 +246,7 @@ app.post("/api/auth/login", (req, res) => {
     return res.json({
         message: "Login successful.",
         token,
-        user: { id: user.id, name: user.name, email: user.email },
+        user: formatUserProfile(user),
     });
 });
 
@@ -225,6 +261,70 @@ app.get("/api/auth/me", requireAuth, (req, res) => {
 app.post("/api/auth/logout", requireAuth, (req, res) => {
     sessions.delete(req.token);
     return res.json({ message: "Logged out successfully." });
+});
+
+// ============================================================================
+// User Profile Endpoints (Protected by requireAuth)
+// ============================================================================
+
+// Get Full Profile
+app.get("/api/user/profile", requireAuth, (req, res) => {
+    return res.json({ profile: req.user });
+});
+
+// Update Profile
+app.put("/api/user/profile", requireAuth, (req, res) => {
+    const user = users.get(req.user.id);
+    if (!user) {
+        return res.status(404).json({ error: "User not found." });
+    }
+
+    const {
+        name,
+        username,
+        phone,
+        location,
+        bio,
+        skills,
+        socialLinks,
+        avatarUrl,
+    } = req.body || {};
+
+    if (name && typeof name === "string" && name.trim().length >= 2) {
+        user.name = name.trim();
+    }
+    if (username && typeof username === "string") {
+        user.username = username.trim().replace(/^@+/, "");
+    }
+    if (typeof phone === "string") {
+        user.phone = phone.trim();
+    }
+    if (typeof location === "string") {
+        user.location = location.trim();
+    }
+    if (typeof bio === "string") {
+        user.bio = bio.trim().slice(0, 200);
+    }
+    if (Array.isArray(skills)) {
+        user.skills = skills.map((s) => String(s).trim()).filter(Boolean);
+    }
+    if (socialLinks && typeof socialLinks === "object") {
+        user.socialLinks = {
+            ...user.socialLinks,
+            ...socialLinks,
+        };
+    }
+    if (typeof avatarUrl === "string") {
+        user.avatarUrl = avatarUrl.trim();
+    }
+
+    const updatedProfile = formatUserProfile(user);
+    req.user = updatedProfile;
+
+    return res.json({
+        message: "Profile updated successfully.",
+        profile: updatedProfile,
+    });
 });
 
 // ============================================================================
