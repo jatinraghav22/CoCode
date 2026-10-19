@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import React, { useState } from "react";
 import {
     ArrowLeft,
     ArrowRight,
@@ -7,6 +6,7 @@ import {
     Code2,
     Copy,
     Hash,
+    LoaderCircle,
     LockKeyhole,
     Plus,
     Sparkles,
@@ -14,39 +14,75 @@ import {
     Video,
     X,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useAuth } from "../AuthContext.jsx";
 import "./Room.css";
+
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function RoomPage({ mode = "create" }) {
     const isCreate = mode === "create";
-    const navigate = useNavigate();
+    const { token, user } = useAuth();
 
-    const [roomName, setRoomName] = useState("My coding room");
-    const [displayName, setDisplayName] = useState("Developer");
+    const [roomName, setRoomName] = useState("My Collaboration Room");
+    const [displayName, setDisplayName] = useState(user?.name || "Developer");
     const [roomCode, setRoomCode] = useState("");
     const [isPrivate, setIsPrivate] = useState(true);
+    const [createdRoom, setCreatedRoom] = useState(null);
     const [createdCode, setCreatedCode] = useState("");
     const [message, setMessage] = useState("");
+    const [isSuccess, setIsSuccess] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    function createRoom(event) {
+    async function createRoom(event) {
         event.preventDefault();
         setMessage("");
         setCopied(false);
+        setIsSuccess(false);
 
         if (roomName.trim().length < 3) {
             setMessage("Room name must contain at least 3 characters.");
             return;
         }
 
-        // Demo-only room code. A backend must create real rooms.
-        const code = Math.random().toString(36).slice(2, 8).toUpperCase();
-        setCreatedCode(code);
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${API_BASE}/api/rooms`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    roomName: roomName.trim(),
+                    displayName: displayName.trim(),
+                    isPrivate,
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to create room.");
+            }
+
+            setCreatedRoom(data.room);
+            setCreatedCode(data.room.code);
+            setIsSuccess(true);
+            setMessage(`Room "${data.room.name}" created successfully on the server.`);
+        } catch (error) {
+            setMessage(error.message || "Could not connect to the room server.");
+            setIsSuccess(false);
+        } finally {
+            setLoading(false);
+        }
     }
 
-    function joinRoom(event) {
+    async function joinRoom(event) {
         event.preventDefault();
         setMessage("");
+        setIsSuccess(false);
 
         const normalizedCode = roomCode.trim().toUpperCase();
 
@@ -55,19 +91,47 @@ export default function RoomPage({ mode = "create" }) {
             return;
         }
 
-        setMessage(
-            `Code ${normalizedCode} is formatted correctly. Real room joining requires the collaboration backend, which is not connected yet.`
-        );
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${API_BASE}/api/rooms/join`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    roomCode: normalizedCode,
+                    displayName: displayName.trim(),
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Could not join room.");
+            }
+
+            setIsSuccess(true);
+            setMessage(
+                `Successfully joined room "${data.room.name}" (${data.room.code}) hosted by ${data.room.hostName}! Active members: ${data.room.members.join(", ")}`
+            );
+        } catch (error) {
+            setIsSuccess(false);
+            setMessage(error.message || "Failed to join room.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     async function copyRoomCode() {
         try {
             await navigator.clipboard.writeText(createdCode);
             setCopied(true);
-            setMessage("Demo room code copied.");
+            setMessage(`Room code ${createdCode} copied to clipboard!`);
+            setIsSuccess(true);
         } catch {
             setCopied(false);
-            setMessage("Copy was unavailable. Select and copy the room code manually.");
+            setMessage("Copy was unavailable. Select and copy the code manually.");
         }
     }
 
@@ -79,17 +143,19 @@ export default function RoomPage({ mode = "create" }) {
                     <span>Co<span>Code</span></span>
                 </Link>
 
-                <Link to="/dashboard" className="room-back-link">
-                    <ArrowLeft size={15} />
-                    Dashboard
-                </Link>
+                <div className="room-nav-links">
+                    <Link to="/dashboard" className="room-back-link">
+                        <ArrowLeft size={15} />
+                        Back to Dashboard
+                    </Link>
+                </div>
             </header>
 
             <section className="room-layout">
                 <div className="room-intro">
                     <div className="room-eyebrow">
                         <Sparkles size={14} />
-                        BUILD SOMETHING TOGETHER
+                        REAL-TIME COLLABORATION
                     </div>
 
                     <h1>
@@ -99,30 +165,30 @@ export default function RoomPage({ mode = "create" }) {
                     </h1>
 
                     <p>
-                        Create a space for your next coding session, or join your team
-                        using a room code. Your collaboration workspace starts here.
+                        Create an authorized collaboration room with your team or student,
+                        or join an existing session using a verified 6-character room code.
                     </p>
 
                     <div className="room-benefits">
                         <div>
                             <span className="room-benefit-icon"><UsersRound size={17} /></span>
                             <span>
-                                <strong>Team-ready experience</strong>
-                                <small>A dedicated flow for coding sessions.</small>
+                                <strong>Authenticated and authorized</strong>
+                                <small>Your session token protects room access and ownership.</small>
                             </span>
                         </div>
                         <div>
                             <span className="room-benefit-icon"><Code2 size={17} /></span>
                             <span>
-                                <strong>Developer-first workspace</strong>
-                                <small>Designed around focus and collaboration.</small>
+                                <strong>Server-verified room lifecycle</strong>
+                                <small>Rooms are registered on the backend with real codes.</small>
                             </span>
                         </div>
                         <div>
                             <span className="room-benefit-icon"><LockKeyhole size={17} /></span>
                             <span>
-                                <strong>Clear access options</strong>
-                                <small>Choose a room name and access preference.</small>
+                                <strong>Privacy controls</strong>
+                                <small>Designate private rooms for invited team members only.</small>
                             </span>
                         </div>
                     </div>
@@ -161,7 +227,7 @@ export default function RoomPage({ mode = "create" }) {
                                 <div className="room-form-heading">
                                     <div className="room-heading-icon"><Video size={20} /></div>
                                     <h2>Create a room<span>.</span></h2>
-                                    <p>Set up a new space for your coding session.</p>
+                                    <p>Set up a verified collaboration space for your coding session.</p>
                                 </div>
 
                                 {!createdCode ? (
@@ -178,7 +244,7 @@ export default function RoomPage({ mode = "create" }) {
                                                     setRoomName(event.target.value);
                                                     setMessage("");
                                                 }}
-                                                placeholder="e.g. Hackathon Project"
+                                                placeholder="e.g. Hackathon Team Room"
                                                 required
                                             />
                                         </div>
@@ -194,7 +260,7 @@ export default function RoomPage({ mode = "create" }) {
                                                     setDisplayName(event.target.value);
                                                     setMessage("");
                                                 }}
-                                                placeholder="Enter your display name"
+                                                placeholder="Enter your name"
                                                 required
                                             />
                                         </div>
@@ -203,7 +269,7 @@ export default function RoomPage({ mode = "create" }) {
                                             <span className="room-private-icon"><LockKeyhole size={16} /></span>
                                             <span>
                                                 <strong>Private room</strong>
-                                                <small>Indicate that the room is intended for invited people.</small>
+                                                <small>Indicate that the room is intended for invited peers only.</small>
                                             </span>
                                             <input
                                                 type="checkbox"
@@ -212,18 +278,27 @@ export default function RoomPage({ mode = "create" }) {
                                             />
                                         </label>
 
-                                        <button className="room-primary-button" type="submit">
-                                            <Plus size={16} />
-                                            Generate demo room code
-                                            <ArrowRight size={16} />
+                                        <button className="room-primary-button" type="submit" disabled={loading}>
+                                            {loading ? (
+                                                <>
+                                                    <LoaderCircle size={16} style={{ animation: "spin 1s linear infinite" }} />
+                                                    <span>Registering room on server...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Plus size={16} />
+                                                    <span>Create verified room</span>
+                                                    <ArrowRight size={16} />
+                                                </>
+                                            )}
                                         </button>
                                     </form>
                                 ) : (
                                     <div className="room-created-state">
                                         <span className="room-success-icon"><CheckCircle2 size={28} /></span>
-                                        <h3>Demo room code generated</h3>
+                                        <h3>Room Created on Server</h3>
                                         <p>
-                                            {roomName} · Hosted by {displayName.trim() || "Developer"}
+                                            {createdRoom?.name || roomName} · Host: {createdRoom?.hostName || displayName}
                                         </p>
 
                                         <div className="room-code-display">
@@ -232,27 +307,38 @@ export default function RoomPage({ mode = "create" }) {
                                                 type="button"
                                                 onClick={copyRoomCode}
                                                 aria-label="Copy room code"
+                                                title="Copy Room Code"
                                             >
                                                 {copied ? <CheckCircle2 size={17} /> : <Copy size={17} />}
                                             </button>
                                         </div>
 
-                                        <div className="room-demo-note">
-                                            <LockKeyhole size={15} />
-                                            This is a local demo code, not a registered room. Other users cannot join it yet.
+                                        <div className="room-demo-note" style={{ background: "rgba(16, 185, 129, 0.1)", borderColor: "rgba(16, 185, 129, 0.3)", color: "#6ee7b7" }}>
+                                            <CheckCircle2 size={15} />
+                                            Active server room. Teammates can enter code "{createdCode}" in the Join Room tab.
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            className="room-secondary-button"
-                                            onClick={() => {
-                                                setCreatedCode("");
-                                                setMessage("");
-                                            }}
-                                        >
-                                            <Plus size={15} />
-                                            Create another demo
-                                        </button>
+                                        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                                            <Link
+                                                to="/compiler"
+                                                className="room-primary-button"
+                                                style={{ flex: 1, textDecoration: "none" }}
+                                            >
+                                                <Code2 size={16} />
+                                                <span>Open in Compiler</span>
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                className="room-secondary-button"
+                                                onClick={() => {
+                                                    setCreatedCode("");
+                                                    setCreatedRoom(null);
+                                                    setMessage("");
+                                                }}
+                                            >
+                                                Create another
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </>
@@ -261,7 +347,7 @@ export default function RoomPage({ mode = "create" }) {
                                 <div className="room-form-heading">
                                     <div className="room-heading-icon"><Hash size={20} /></div>
                                     <h2>Join a room<span>.</span></h2>
-                                    <p>Enter the 6-character code shared by your host.</p>
+                                    <p>Enter the 6-character code registered by your host.</p>
                                 </div>
 
                                 <form className="room-form" onSubmit={joinRoom}>
@@ -284,10 +370,10 @@ export default function RoomPage({ mode = "create" }) {
                                                 );
                                                 setMessage("");
                                             }}
-                                            placeholder="ABC123"
+                                            placeholder="e.g. DEMO01"
                                             required
                                         />
-                                        <small>Letters and numbers only.</small>
+                                        <small>Tip: Try the active seeded demo room <code>DEMO01</code>.</small>
                                     </div>
 
                                     <div className="room-field">
@@ -301,36 +387,50 @@ export default function RoomPage({ mode = "create" }) {
                                                 setDisplayName(event.target.value);
                                                 setMessage("");
                                             }}
-                                            placeholder="Enter your display name"
+                                            placeholder="Enter your name"
                                             required
                                         />
                                     </div>
 
-                                    <button className="room-primary-button" type="submit">
-                                        <UsersRound size={16} />
-                                        Validate room code
-                                        <ArrowRight size={16} />
+                                    <button className="room-primary-button" type="submit" disabled={loading}>
+                                        {loading ? (
+                                            <>
+                                                <LoaderCircle size={16} style={{ animation: "spin 1s linear infinite" }} />
+                                                <span>Verifying code with server...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <UsersRound size={16} />
+                                                <span>Join verified room</span>
+                                                <ArrowRight size={16} />
+                                            </>
+                                        )}
                                     </button>
-
-                                    <div className="room-demo-note">
-                                        <LockKeyhole size={15} />
-                                        Room membership and live collaboration are not connected yet.
-                                    </div>
                                 </form>
                             </>
                         )}
 
                         {message && (
-                            <div className="room-feedback" role="status">
-                                {message.startsWith("Code ") || message.startsWith("Demo")
-                                    ? <CheckCircle2 size={16} />
-                                    : <X size={16} />}
+                            <div
+                                className="room-feedback"
+                                role="status"
+                                style={
+                                    isSuccess
+                                        ? { borderColor: "rgba(16, 185, 129, 0.4)", color: "#6ee7b7" }
+                                        : { borderColor: "rgba(244, 63, 94, 0.4)", color: "#fca5a5" }
+                                }
+                            >
+                                {isSuccess ? (
+                                    <CheckCircle2 size={16} style={{ color: "#10b981", flexShrink: 0 }} />
+                                ) : (
+                                    <X size={16} style={{ color: "#f43f5e", flexShrink: 0 }} />
+                                )}
                                 <span>{message}</span>
                             </div>
                         )}
 
                         <div className="room-form-footer">
-                            <span>Prefer coding solo?</span>
+                            <span>Prefer solo coding?</span>
                             <Link to="/compiler">Open public compiler <ArrowRight size={13} /></Link>
                         </div>
                     </div>
@@ -344,4 +444,3 @@ export default function RoomPage({ mode = "create" }) {
         </main>
     );
 }
-

@@ -1,404 +1,554 @@
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  Play,
+  ArrowRight,
+  Terminal,
+  Users,
+  Cpu,
+  Share2,
+  CheckCircle2,
+  Copy,
+  Sparkles,
+  ChevronRight,
+  ShieldCheck,
+  Monitor,
+  X,
+} from "lucide-react";
+import Navbar from "./components/Navbar.jsx";
+import Footer from "./components/Footer.jsx";
+import Button from "./components/Button.jsx";
 import "./App.css";
 
-const codeSamples = {
+const CODE_PREVIEWS = {
   Python: {
-    file: "main.py",
-    lines: [
-      { text: "# Your next idea starts here", kind: "comment" },
-      { text: "def greet(name):", kind: "keyword" },
-      { text: '    return f"Hello, {name}!"', kind: "string" },
-      { text: "" },
-      { text: 'print(greet("Developer"))', kind: "function" },
+    filename: "algorithm.py",
+    languageId: "python",
+    code: `# Real-Time Prime Sieve Algorithm
+def sieve_primes(limit: int) -> list:
+    is_prime = [True] * (limit + 1)
+    is_prime[0] = is_prime[1] = False
+    
+    for i in range(2, int(limit**0.5) + 1):
+        if is_prime[i]:
+            for j in range(i*i, limit + 1, i):
+                is_prime[j] = False
+                
+    return [x for x in range(limit + 1) if is_prime[x]]
+
+result = sieve_primes(30)
+print(f"Discovered {len(result)} primes:", result)`,
+    output: [
+      { type: "meta", text: "$ python3 algorithm.py" },
+      { type: "stdout", text: "Discovered 10 primes: [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]" },
+      { type: "success", text: "✓ Process completed in 0.041s • Memory: 11.2 MB" },
     ],
-    output: ["$ python main.py", "Hello, Developer!"],
   },
   JavaScript: {
-    file: "main.js",
-    lines: [
-      { text: "// Build something amazing", kind: "comment" },
-      { text: "const greet = (name) => {", kind: "keyword" },
-      { text: '  return "Hello, " + name + "!";', kind: "string" },
-      { text: "};" },
-      { text: 'console.log(greet("Developer"));', kind: "function" },
+    filename: "collaborator.js",
+    languageId: "javascript",
+    code: `// CoCode Realtime Session Handler
+class PeerSession {
+  constructor(roomCode, developer) {
+    this.room = roomCode;
+    this.user = developer;
+    this.latency = "12ms";
+  }
+
+  syncBuffer(changeSet) {
+    return {
+      status: "SYNCED",
+      version: 42,
+      collaborators: ["Alice", "Bob", this.user],
+      timestamp: Date.now()
+    };
+  }
+}
+
+const session = new PeerSession("ROOM-9042", "You");
+console.log(session.syncBuffer({ line: 12, char: "const x = 10;" }));`,
+    output: [
+      { type: "meta", text: "$ node collaborator.js" },
+      {
+        type: "stdout",
+        text: '{ status: "SYNCED", version: 42, collaborators: [ "Alice", "Bob", "You" ] }',
+      },
+      { type: "success", text: "✓ Process completed in 0.029s • Memory: 18.4 MB" },
     ],
-    output: ["$ node main.js", "Hello, Developer!"],
   },
   "C++": {
-    file: "main.cpp",
-    lines: [
-      { text: "#include <iostream>", kind: "keyword" },
-      { text: "using namespace std;", kind: "keyword" },
-      { text: "" },
-      { text: "int main() {", kind: "function" },
-      { text: '    cout << "Hello, Developer!";', kind: "string" },
-      { text: "    return 0;", kind: "keyword" },
-      { text: "}", kind: "function" },
+    filename: "factorial.cpp",
+    languageId: "cpp",
+    code: `#include <iostream>
+#include <vector>
+
+// Ultra-fast recursive memoized factorial
+long long factorial(int n) {
+    static std::vector<long long> memo(30, 0);
+    if (n <= 1) return 1;
+    if (memo[n] != 0) return memo[n];
+    return memo[n] = n * factorial(n - 1);
+}
+
+int main() {
+    int target = 15;
+    std::cout << "Factorial of " << target << " = " 
+              << factorial(target) << std::endl;
+    return 0;
+}`,
+    output: [
+      { type: "meta", text: "$ g++ -O3 factorial.cpp -o main && ./main" },
+      { type: "stdout", text: "Factorial of 15 = 1307674368000" },
+      { type: "success", text: "✓ Process completed in 0.012s • Memory: 4.8 MB" },
     ],
-    output: ["$ ./main", "Hello, Developer!"],
   },
 };
 
-const features = [
+const FEATURE_CARDS = [
   {
-    number: "01",
-    symbol: "</>",
-    title: "Instant coding",
+    icon: Terminal,
+    title: "Online Compiler",
+    badge: "INSTANT RUNTIME",
     description:
-      "Open your workspace, write code and start building without unnecessary friction.",
-    tag: "DEVELOPER FIRST",
+      "Execute Python 3, Node.js, and C++ code with zero configuration, lightning-fast compilation, and immediate terminal output.",
+    linkText: "Try Compiler",
+    to: "/compiler",
   },
   {
-    number: "02",
-    symbol: "⌘",
-    title: "Collaborate together",
+    icon: Users,
+    title: "Real-time Collaboration",
+    badge: "PAIR PROGRAMMING",
     description:
-      "A shared space designed for pair programming, learning and building with your team.",
-    tag: "TEAM READY",
+      "Code concurrently with peers in shared virtual rooms. View live cursor movements, sync changes instantly, and debug together.",
+    linkText: "Start Room",
+    to: "/rooms/create",
   },
   {
-    number: "03",
-    symbol: "↗",
-    title: "Your ideas, faster",
+    icon: Cpu,
+    title: "Modern IDE",
+    badge: "MONACO POWERED",
     description:
-      "A focused developer experience with clear tools, helpful feedback and less clutter.",
-    tag: "BUILT FOR FLOW",
+      "Powered by the industry-standard Monaco editor engine with full syntax highlighting, intelligent autocompletion, and keyboard shortcuts.",
+    linkText: "Explore Editor",
+    to: "/compiler",
+  },
+  {
+    icon: Share2,
+    title: "Create & Join Rooms",
+    badge: "SEAMLESS SHARING",
+    description:
+      "Spin up private or public collaboration rooms in seconds with a unique 6-character room code. No complex server setup required.",
+    linkText: "Join Room",
+    to: "/rooms/join",
   },
 ];
 
-const steps = [
-  { number: "01", title: "Open CoCode", text: "Jump straight into your workspace." },
-  { number: "02", title: "Write your idea", text: "Turn a blank editor into something real." },
-  { number: "03", title: "Run and build", text: "Test your work and keep improving." },
-];
-
-function App() {
-  const [serverStatus, setServerStatus] = useState("checking");
+export default function App() {
   const [activeLanguage, setActiveLanguage] = useState("Python");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [showOutput, setShowOutput] = useState(true);
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const currentPreview = CODE_PREVIEWS[activeLanguage];
 
-    fetch("http://localhost:5000/api/health", {
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Backend health check failed");
-        }
-        return response.json();
-      })
-      .then((data) => {
-        setServerStatus(data.status === "healthy" ? "healthy" : "offline");
-      })
-      .catch((error) => {
-        if (error.name !== "AbortError") {
-          setServerStatus("offline");
-        }
-      });
+  const handleSimulateRun = () => {
+    setIsRunning(true);
+    setShowOutput(false);
+    setTimeout(() => {
+      setIsRunning(false);
+      setShowOutput(true);
+    }, 450);
+  };
 
-    return () => controller.abort();
-  }, []);
-
-  const sample = codeSamples[activeLanguage];
-
-  const closeMenu = () => setMenuOpen(false);
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(currentPreview.code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
   return (
-    <main className="site-shell" id="home">
-      <header className="site-header">
-        <a className="brand" href="#home" onClick={closeMenu} aria-label="CoCode home">
-          <span className="brand-mark">C</span>
-          <span>Co<span className="brand-light">Code</span></span>
-          <span className="brand-beta">DEV</span>
-        </a>
+    <div className="home-page">
+      <Navbar />
 
-        <button
-          className="menu-toggle"
-          type="button"
-          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          <span />
-          <span />
-        </button>
-
-        <nav className={`site-nav ${menuOpen ? "is-open" : ""}`}>
-          <a href="#features" onClick={closeMenu}>Features</a>
-          <a href="/compiler" onClick={closeMenu}>Compiler</a>
-          <a href="#workflow" onClick={closeMenu}>How it works</a>
-          <a href="#rooms" onClick={closeMenu}>Collaboration</a>
-        </nav>
-
-        <div className="header-actions">
-          <span className={`backend-chip status-${serverStatus}`}>
-            <span className="status-dot" />
-            {serverStatus === "checking"
-              ? "Connecting"
-              : serverStatus === "healthy"
-                ? "Systems online"
-                : "API offline"}
-          </span>
-          <a className="button button-small button-primary" href="#compiler-preview">
-            Start coding <span aria-hidden="true">↗</span>
-          </a>
-        </div>
-      </header>
-
+      {/* Hero Section */}
       <section className="hero-section">
-        <div className="hero-copy">
-          <div className="eyebrow">
-            <span className="eyebrow-spark">✳</span>
-            THE DEVELOPER SPACE
-            <span className="eyebrow-divider" />
-            BUILT FOR YOU
+        {/* Ambient Glows */}
+        <div className="ambient-glow-orb glow-violet" />
+        <div className="ambient-glow-orb glow-cyan" />
+
+        <div className="hero-content">
+          {/* Hero Badge */}
+          <div className="hero-badge-wrap">
+            <div className="badge-pill">
+              <span className="badge-dot" />
+              <span>Code Together • Build Faster</span>
+            </div>
           </div>
 
-          <h1 className="hero-title">
-            Think it.
-            <br />
-            <span className="gradient-text">Code it.</span>
-            <br />
-            <span className="title-outline">Make it real.</span>
+          {/* Main Heading */}
+          <h1 className="hero-heading">
+            The Ultimate <br />
+            <span className="gradient-text">Developer Platform</span>
           </h1>
 
-          <p className="hero-description">
-            Meet your new favorite coding space. Write code, explore ideas,
-            and collaborate — all in one beautifully designed developer platform.
+          {/* Supporting Text */}
+          <p className="hero-subtitle">
+            Write code, compile instantly, and collaborate with developers in real time.
+            A sleek, distraction-free environment built for modern engineering.
           </p>
 
-          <div className="hero-actions">
-            <a className="button button-primary button-large" href="#compiler-preview">
-              Explore compiler <span aria-hidden="true">↗</span>
-            </a>
-            <a className="button button-secondary button-large" href="#features">
-              Discover CoCode <span aria-hidden="true">↓</span>
-            </a>
+          {/* CTA Buttons */}
+          <div className="hero-cta-group">
+            <Button
+              variant="primary"
+              size="lg"
+              to="/compiler"
+              iconRight={ArrowRight}
+            >
+              Start Coding Free
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => setDemoModalOpen(true)}
+              icon={Play}
+            >
+              Watch Demo
+            </Button>
           </div>
 
-          <div className="hero-proof">
-            <div className="avatar-stack" aria-hidden="true">
-              <span>J</span>
-              <span>C</span>
-              <span>D</span>
-              <span>+</span>
+          {/* Trust Highlights */}
+          <div className="hero-trust-row">
+            <div className="trust-item">
+              <CheckCircle2 size={16} className="trust-icon" />
+              <span>Zero setup required</span>
             </div>
-            <div className="proof-copy">
-              <span className="proof-title">Built for curious minds.</span>
-              <span className="proof-subtitle">From first line to big idea.</span>
+            <div className="trust-dot">•</div>
+            <div className="trust-item">
+              <CheckCircle2 size={16} className="trust-icon" />
+              <span>3+ High-performance runtimes</span>
             </div>
-            <span className="proof-sparkle" aria-hidden="true">✦</span>
+            <div className="trust-dot">•</div>
+            <div className="trust-item">
+              <CheckCircle2 size={16} className="trust-icon" />
+              <span>Free & open to everyone</span>
+            </div>
           </div>
-
-          <div className="hero-orbit orbit-one" />
-          <div className="hero-orbit orbit-two" />
         </div>
 
-        <div className="hero-visual" id="compiler-preview">
-          <div className="visual-glow" />
-          <div className="floating-label floating-label-top">
-            <span className="floating-icon">✳</span>
-            <span>
-              <strong>Stay in flow</strong>
-              <small>Your ideas, uninterrupted.</small>
-            </span>
-          </div>
-
-          <div className="editor-window">
-            <div className="window-topbar">
-              <div className="window-controls" aria-hidden="true">
-                <span className="control-red" />
-                <span className="control-yellow" />
-                <span className="control-green" />
+        {/* Code Editor Preview Window */}
+        <div className="editor-preview-container" id="compiler-preview">
+          <div className="editor-preview-frame">
+            {/* Window Header */}
+            <div className="preview-window-header">
+              <div className="window-dots">
+                <span className="dot dot-red" />
+                <span className="dot dot-yellow" />
+                <span className="dot dot-green" />
               </div>
-              <span className="window-title">CoCode <span>/ workspace</span></span>
-              <span className="window-status"><i /> READY</span>
-            </div>
 
-            <div className="editor-toolbar">
-              <div className="file-tab">
-                <span className="file-icon">⌘</span>
-                {sample.file}
-                <span className="file-unsaved" />
-              </div>
-              <span className="editor-toolbar-right">UTF-8 <span>⌄</span></span>
-            </div>
-
-            <div className="language-tabs" aria-label="Code sample language">
-              {Object.keys(codeSamples).map((language) => (
-                <button
-                  key={language}
-                  type="button"
-                  className={`language-tab ${activeLanguage === language ? "active" : ""}`}
-                  onClick={() => setActiveLanguage(language)}
-                  aria-pressed={activeLanguage === language}
-                >
-                  {language === "Python" ? "Py" : language === "JavaScript" ? "JS" : "C++"}
-                  <span>{language}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="editor-body">
-              <div className="code-lines">
-                {sample.lines.map((line, index) => (
-                  <div className="code-line" key={`${activeLanguage}-${index}`}>
-                    <span className="line-number">{String(index + 1).padStart(2, "0")}</span>
-                    <code className={line.kind || ""}>{line.text || "\u00A0"}</code>
-                  </div>
+              {/* Language Selector */}
+              <div className="language-selector-pills">
+                {Object.keys(CODE_PREVIEWS).map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    className={`lang-pill ${activeLanguage === lang ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveLanguage(lang);
+                      setShowOutput(true);
+                    }}
+                  >
+                    {lang}
+                  </button>
                 ))}
-                <div className="editor-cursor-line">
-                  <span className="line-number">↳</span>
-                  <span className="cursor-block" />
+              </div>
+
+              {/* Run Action */}
+              <div className="window-actions">
+                <button
+                  type="button"
+                  className="copy-btn"
+                  onClick={handleCopyCode}
+                  title="Copy Code"
+                >
+                  {copiedCode ? <CheckCircle2 size={15} /> : <Copy size={15} />}
+                  <span>{copiedCode ? "Copied" : "Copy"}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`run-code-btn ${isRunning ? "running" : ""}`}
+                  onClick={handleSimulateRun}
+                  disabled={isRunning}
+                >
+                  {isRunning ? (
+                    <span className="btn-spinner" />
+                  ) : (
+                    <Play size={14} fill="currentColor" />
+                  )}
+                  <span>{isRunning ? "Compiling..." : "Run Code"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Editor Workspace Split */}
+            <div className="preview-split">
+              {/* Code Panel */}
+              <div className="preview-code-panel">
+                <div className="code-panel-tab">
+                  <Terminal size={14} />
+                  <span>{currentPreview.filename}</span>
+                  <span className="file-status-indicator" />
+                </div>
+                <div className="code-lines-scroll">
+                  <pre className="code-block">
+                    <code>
+                      {currentPreview.code.split("\n").map((line, idx) => (
+                        <div className="code-row" key={idx}>
+                          <span className="row-number">{idx + 1}</span>
+                          <span className="row-content">{line || " "}</span>
+                        </div>
+                      ))}
+                    </code>
+                  </pre>
+                </div>
+              </div>
+
+              {/* Terminal Output Panel */}
+              <div className="preview-terminal-panel">
+                <div className="terminal-header">
+                  <div className="terminal-title">
+                    <span className="term-symbol">›_</span>
+                    <span>TERMINAL OUTPUT</span>
+                  </div>
+                  <span className="term-badge">Live Preview</span>
+                </div>
+
+                <div className="terminal-body">
+                  {isRunning ? (
+                    <div className="terminal-executing">
+                      <span className="btn-spinner" />
+                      <span>Executing in sandbox environment...</span>
+                    </div>
+                  ) : showOutput ? (
+                    <div className="terminal-lines">
+                      {currentPreview.output.map((line, idx) => (
+                        <div
+                          key={idx}
+                          className={`terminal-line line-${line.type}`}
+                        >
+                          {line.text}
+                        </div>
+                      ))}
+                      <div className="terminal-prompt">
+                        <span className="prompt-cursor">▋</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="terminal-empty">Output will appear here.</div>
+                  )}
+                </div>
+
+                <div className="terminal-footer">
+                  <Link to="/compiler" className="term-cta-link">
+                    Open Full Compiler Workspace <ChevronRight size={14} />
+                  </Link>
                 </div>
               </div>
             </div>
-
-            <div className="output-header">
-              <span><span className="terminal-symbol">›_</span> SAMPLE OUTPUT</span>
-              <span className="output-example">EXAMPLE</span>
-            </div>
-            <div className="output-body">
-              {sample.output.map((line, index) => (
-                <p className={index === 0 ? "output-command" : "output-result"} key={line}>
-                  {line}
-                </p>
-              ))}
-              <p className="output-success"><span>✓</span> Example output preview</p>
-            </div>
-
-            <div className="editor-footer">
-              <span><i className="footer-dot" /> CoCode workspace</span>
-              <span>Made for makers <span className="footer-heart">♥</span></span>
-            </div>
           </div>
-
-          <div className="floating-label floating-label-bottom">
-            <span className="success-orb">✓</span>
-            <span>
-              <strong>Ready for your next idea?</strong>
-              <small>Start coding without an account.</small>
-            </span>
-          </div>
-          <div className="visual-index"><span>01</span> / YOUR WORKSPACE</div>
         </div>
       </section>
 
-      <section className="trust-strip" aria-label="CoCode highlights">
-        <span className="trust-label">MADE FOR THE WAY YOU BUILD</span>
-        <span className="trust-item"><i>✳</i> Fast to start</span>
-        <span className="trust-item"><i>⌘</i> Designed to focus</span>
-        <span className="trust-item"><i>↗</i> Room to grow</span>
-        <span className="trust-item"><i>∞</i> Ideas welcome</span>
-      </section>
-
-      <section className="section features-section" id="features">
-        <div className="section-heading">
-          <div>
-            <div className="section-kicker"><span /> THE COCODE DIFFERENCE</div>
-            <h2>
-              Less friction.
-              <br />
-              <span className="gradient-text">More creation.</span>
+      {/* Feature Cards Section */}
+      <section className="features-section" id="features">
+        <div className="section-container">
+          <div className="section-header">
+            <div className="badge-pill">
+              <Sparkles size={14} />
+              <span>POWERFUL CAPABILITIES</span>
+            </div>
+            <h2 className="section-title">
+              Engineered for Speed, Clarity, <br />
+              <span className="gradient-text">and Seamless Teamwork</span>
             </h2>
-          </div>
-          <p>
-            Everything starts with a great experience. CoCode brings your
-            developer workflow into one clear, focused space.
-          </p>
-        </div>
-
-        <div className="feature-grid">
-          {features.map((feature) => (
-            <article className="feature-card" key={feature.number}>
-              <div className="feature-card-top">
-                <span className="feature-symbol">{feature.symbol}</span>
-                <span className="feature-number">{feature.number}</span>
-              </div>
-              <span className="feature-tag">{feature.tag}</span>
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
-              <a href="#compiler-preview" className="feature-link" aria-label={`Explore ${feature.title}`}>
-                Explore <span aria-hidden="true">↗</span>
-              </a>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="workflow-section section" id="workflow">
-        <div className="workflow-intro">
-          <div className="section-kicker"><span /> YOUR FLOW, SIMPLIFIED</div>
-          <h2>From blank page<br />to <span className="gradient-text">brilliant idea.</span></h2>
-          <p>No complicated setup to explore the experience. Start with a small idea and build from there.</p>
-          <a className="text-link" href="#compiler-preview">Explore the preview <span aria-hidden="true">→</span></a>
-        </div>
-        <div className="steps-list">
-          {steps.map((step) => (
-            <div className="step-row" key={step.number}>
-              <span className="step-number">{step.number}</span>
-              <span className="step-connector" />
-              <div>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
-              </div>
-              <span className="step-arrow" aria-hidden="true">↗</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="collab-section section" id="rooms">
-        <div className="collab-panel">
-          <div className="collab-decoration decoration-one" />
-          <div className="collab-decoration decoration-two" />
-          <div className="collab-copy">
-            <div className="section-kicker"><span /> BUILT FOR WHAT'S NEXT</div>
-            <h2>Great code.<br /><span className="gradient-text">Better together.</span></h2>
-            <p>
-              A workspace designed to grow with your projects — from solo
-              experiments to collaborative coding sessions.
+            <p className="section-description">
+              Whether you are testing an algorithm in seconds or building a prototype with a peer,
+              CoCode equips you with everything needed in one streamlined tab.
             </p>
-            <a href="#compiler-preview" className="button button-primary button-large">
-              Start exploring <span aria-hidden="true">↗</span>
-            </a>
           </div>
-          <div className="collab-art" aria-hidden="true">
-            <div className="art-ring ring-one" />
-            <div className="art-ring ring-two" />
-            <div className="art-core">&lt;/&gt;</div>
-            <div className="art-node node-one">JS</div>
-            <div className="art-node node-two">Py</div>
-            <div className="art-node node-three">C+</div>
-            <div className="art-node node-four">✦</div>
+
+          <div className="features-grid">
+            {FEATURE_CARDS.map((feat) => {
+              const Icon = feat.icon;
+              return (
+                <div className="feature-card glass-panel" key={feat.title}>
+                  <div className="feature-card-top">
+                    <div className="feature-icon-box">
+                      <Icon size={24} />
+                    </div>
+                    <span className="feature-badge">{feat.badge}</span>
+                  </div>
+                  <h3 className="feature-title">{feat.title}</h3>
+                  <p className="feature-desc">{feat.description}</p>
+                  <Link to={feat.to} className="feature-link">
+                    <span>{feat.linkText}</span>
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      <section className="final-cta section" id="about">
-        <div className="cta-glow" />
-        <div className="section-kicker"><span /> YOUR NEXT LINE STARTS HERE</div>
-        <h2>Have an idea?<br /><span className="gradient-text">Let's make it real.</span></h2>
-        <p>Explore the CoCode experience and take the first step on your next project.</p>
-        <a href="#compiler-preview" className="button button-primary button-large">
-          Explore CoCode <span aria-hidden="true">↗</span>
-        </a>
-        <span className="cta-note"><i /> No account needed to explore the compiler preview</span>
+      {/* Collaboration Callout Section */}
+      <section className="rooms-callout-section" id="rooms">
+        <div className="section-container">
+          <div className="rooms-banner glass-panel">
+            <div className="rooms-banner-content">
+              <span className="rooms-badge">PAIR PROGRAMMING</span>
+              <h2 className="rooms-banner-title">
+                Code With Anyone, Anywhere. <br />
+                <span className="gradient-text">Zero Latency Sync.</span>
+              </h2>
+              <p className="rooms-banner-p">
+                Share a simple 6-character room code with your teammate or student.
+                Jump directly into a joint coding session with synced code, instant runs, and team focus.
+              </p>
+              <div className="rooms-banner-actions">
+                <Button variant="primary" size="md" to="/rooms/create" iconRight={ArrowRight}>
+                  Create Collaboration Room
+                </Button>
+                <Button variant="outline" size="md" to="/rooms/join">
+                  Join Existing Room
+                </Button>
+              </div>
+            </div>
+
+            <div className="rooms-banner-graphic" aria-hidden="true">
+              <div className="room-graphic-card user-one">
+                <div className="user-indicator">
+                  <span className="user-dot dot-violet" />
+                  <span>Developer (You)</span>
+                </div>
+                <code>function optimize() &#123;</code>
+              </div>
+              <div className="room-graphic-card user-two">
+                <div className="user-indicator">
+                  <span className="user-dot dot-cyan" />
+                  <span>Peer (Connected)</span>
+                </div>
+                <code>return computeFast();</code>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <footer className="site-footer">
-        <a className="brand footer-brand" href="#home">
-          <span className="brand-mark">C</span>
-          <span>Co<span className="brand-light">Code</span></span>
-        </a>
-        <span>Think clearly. Build boldly.</span>
-        <a href="#home" className="back-to-top">Back to top ↑</a>
-        <span className="copyright">© {new Date().getFullYear()} CoCode</span>
-      </footer>
-    </main>
+      {/* About Section */}
+      <section className="about-section" id="about">
+        <div className="section-container">
+          <div className="about-card glass-panel">
+            <div className="about-grid">
+              <div>
+                <div className="badge-pill">
+                  <ShieldCheck size={14} />
+                  <span>DEVELOPER FIRST</span>
+                </div>
+                <h2 className="about-heading">
+                  Why We Built <span className="gradient-text">CoCode</span>
+                </h2>
+                <p className="about-text">
+                  Setting up local compilers, managing SDK versions, and configuring screen sharing
+                  for simple code reviews wastes valuable engineering momentum.
+                </p>
+                <p className="about-text">
+                  CoCode provides a pure, zero-overhead browser workspace that brings modern syntax,
+                  verified remote compilation, and instant rooms straight to your browser.
+                </p>
+              </div>
+
+              <div className="about-stats-grid">
+                <div className="stat-box">
+                  <div className="stat-number">3+</div>
+                  <div className="stat-label">Core Runtimes</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-number">&lt; 50ms</div>
+                  <div className="stat-label">Editor Response</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-number">100%</div>
+                  <div className="stat-label">Browser Accessible</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-number">0</div>
+                  <div className="stat-label">Setup Configs Needed</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Watch Demo Modal */}
+      {demoModalOpen && (
+        <div className="modal-backdrop" onClick={() => setDemoModalOpen(false)}>
+          <div
+            className="modal-content glass-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div className="modal-title-wrap">
+                <Sparkles size={18} className="text-violet" />
+                <h3>CoCode Platform Walkthrough</h3>
+              </div>
+              <button
+                className="modal-close-btn"
+                type="button"
+                onClick={() => setDemoModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="demo-player-box">
+                <div className="demo-live-preview">
+                  <Monitor size={48} className="demo-icon" />
+                  <h4>Interactive Code & Room Demonstration</h4>
+                  <p>
+                    Experience real-time code execution with Judge0 backend and multi-room
+                    collaboration right from your browser.
+                  </p>
+                  <div className="demo-actions">
+                    <Button
+                      variant="primary"
+                      size="md"
+                      to="/compiler"
+                      onClick={() => setDemoModalOpen(false)}
+                      iconRight={ArrowRight}
+                    >
+                      Open Live Compiler
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      to="/rooms/create"
+                      onClick={() => setDemoModalOpen(false)}
+                    >
+                      Create Collaboration Room
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Footer />
+    </div>
   );
 }
-
-export default App;

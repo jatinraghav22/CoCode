@@ -1,0 +1,314 @@
+/* CoCode dynamic theme adapter.
+   Colors come from ThemeContext.jsx and update when a theme is selected. */
+
+.site-shell {
+    --surface: var(--cc-surface);
+    --line: var(--cc-border);
+    --muted: var(--cc-muted);
+    --violet: var(--cc-primary);
+    --cyan: var(--cc-secondary);
+
+    color: var(--cc-text);
+    background:
+        radial-gradient(ellipse at 12% 8%,
+            color-mix(in srgb, var(--cc-primary) 12%, transparent),
+            transparent 34%),
+        radial-gradient(ellipse at 83% 15%,
+            color-mix(in srgb, var(--cc-secondary) 8%, transparent),
+            transparent 35%),
+        var(--cc-bg) !important;
+}
+
+.site-shell .gradient-text,
+.site-shell .hero-title .gradient-text,
+.site-shell .brand-light,
+.auth-page .auth-gradient-text,
+.room-page .room-intro h1 span,
+.compiler-page .compiler-intro h1 span,
+.dashboard-page .welcome-copy h1 span {
+    background: linear-gradient(105deg,
+            var(--cc-accent),
+            var(--cc-primary) 52%,
+            var(--cc-secondary)) !important;
+    background-clip: text !important;
+    color: transparent !important;
+    -webkit-background-clip: text !important;
+}
+
+.site-shell .button-primary,
+.dashboard-page .dash-button-primary,
+.dashboard-page .dash-auth-primary,
+.compiler-page .run-code-button,
+.auth-page .auth-submit,
+.room-page .room-primary-button {
+    border-color: color-mix(in srgb, var(--cc-secondary) 55%, transparent) !important;
+    background: var(--cc-gradient) !important;
+    box-shadow: 0 8px 26px var(--cc-glow) !important;
+}
+
+.site-shell .button-primary:hover,
+.dashboard-page .dash-button-primary:hover,
+.dashboard-page .dash-auth-primary:hover,
+.compiler-page .run-code-button:hover:not(:disabled),
+.auth-page .auth-submit:hover,
+.room-page .room-primary-button:hover {
+    box-shadow: 0 10px 30px var(--cc-glow) !important;
+}
+
+.site-shell .editor-window,
+.site-shell .feature-card,
+.site-shell .floating-label {
+    border-color: var(--cc-border) !important;
+}
+
+.site-shell .editor-window::before,
+.site-shell .feature-card::before {
+    background: linear-gradient(90deg,
+            transparent,
+            var(--cc-primary),
+            var(--cc-secondary),
+            transparent) !important;
+}
+
+.site-shell .language-tab.active,
+.site-shell .feature-symbol,
+.site-shell .floating-icon {
+    border-color: var(--cc-border) !important;
+    background: color-mix(in srgb, var(--cc-primary) 14%, var(--cc-surface)) !important;
+    color: var(--cc-accent) !important;
+}
+
+.site-shell .cursor-block {
+    background: var(--cc-secondary) !important;
+    box-shadow: 0 0 12px var(--cc-glow) !important;
+}
+
+/* Dashboard */
+.dashboard-page {
+    --dash-bg: var(--cc-bg);
+    --dash-surface: var(--cc-surface);
+    --dash-surface-2: var(--cc-raised);
+    --dash-border: var(--cc-border);
+    --dash-text: var(--cc-text);
+    --dash-muted: var(--cc-muted);
+
+    color: var(--cc-text);
+    background: var(--cc-bg) !important;
+}
+
+.dashboard-page .dashboard-sidebar,
+.dashboard-page .dashboard-topbar {
+    border-color: var(--cc-border) !important;
+    background: color-mix(in srgb, var(--cc-bg) 88%, var(--cc-surface)) !important;
+}
+
+.dashboard-page .dashboard-welcome,
+.dashboard-page .dash-stat-card,
+.dashboard-page .dashboard-project-card,
+.dashboard-page .activity-card,
+.dashboard-page .quick-actions-card,
+.dashboard-page .sidebar-tip {
+    border-color: var(--cc-border) !important;
+}
+
+.dashboard-page .dashboard-welcome {
+    background:
+        radial-gradient(ellipse at 82% 30%,
+            color-mix(in srgb, var(--cc-primary) 18%, transparent),
+            transparent 49%),
+        linear-gradient(110deg, var(--cc-surface), var(--cc-raised)) !important;
+}
+
+.dashboard-page .dash-stat-card,
+.dashboard-page .dashboard-project-card,
+.dashboard-page .activity-card,
+.dashboard-page .quick-actions-card {
+    background: var(--cc-surface) !important;
+}
+
+.dashboard-page .sidebar-tip,
+.dashboard-page .sidebar-workspace,
+.dashboard-page .dashboard-search,
+.dashboard-page .dash-icon-button {
+    background: var(--cc-surface) !important;
+}
+
+.dashboard-page .dash-nav-item.active {
+    border-color: var(--cc-border) !important;
+    background: color-mix(in srgb, var(--cc-primary) 19%, var(--cc-surface)) !important;
+    box-shadow: inset 2px 0 var(--cc-secondary) !important;
+    color: var(--cc-text) !important;
+}
+
+.dashboard-page .dash-nav-item.active>svg,
+.dashboard-page .dashboard-eyebrow svg,
+.dashboard-page .project-sort svg {
+    color: var(--cc-secondary) !important;
+}
+
+.dashboard-page .stat-violet,
+.dashboard-page .stat-cyan,
+.dashboard-page .project-language-icon.violet,
+.dashboard-page .project-language-icon.cyan,
+.dashboard-page .quick-violet,
+.dashboard-page .quick-cyan {
+    border-color: var(--cc-border) !important;
+    background: color-mix(in srgb, var(--cc-primary) 12%, var(--cc-surface)) !important;
+    color: var(--cc-secondary) !important;
+}
+
+.dashboard-page .welcome-code-core {
+    border-color: var(--cc-border) !important;
+    background: linear-gradient(145deg, var(--cc-primary), var(--cc-raised)) !important;
+    box-shadow: 0 0 40px var(--cc-glow) !important;
+}
+
+/* Online compiler */
+.compiler-page {
+    --compiler-bg: var(--cc-bg);
+    --compiler-panel: var(--cc-surface);
+    --compiler-panel-soft: var(--cc-raised);
+    --compiler-border: var(--cc-border);
+    --compiler-muted: var(--cc-muted);
+    --compiler-violet: var(--cc-primary);
+    --compiler-cyan: var(--cc-secondary);
+
+    color: var(--cc-text);
+    background: var(--cc-bg) !important;
+}
+
+.compiler-page .compiler-workspace,
+.compiler-page .compiler-editor-toolbar,
+.compiler-page .compiler-console-panel,
+.compiler-page .console-titlebar,
+.compiler-page .console-tabs,
+.compiler-page .compiler-editor-footer,
+.compiler-page .console-bottom-bar {
+    border-color: var(--cc-border) !important;
+}
+
+.compiler-page .compiler-workspace {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22), 0 0 40px var(--cc-glow) !important;
+}
+
+.compiler-page .compiler-editor-container,
+.compiler-page .monaco-editor,
+.compiler-page .monaco-editor-background,
+.compiler-page .monaco-editor .margin {
+    background-color: var(--cc-bg) !important;
+}
+
+.compiler-page .language-select-wrap,
+.compiler-page .stdin-editor {
+    border-color: var(--cc-border) !important;
+    background-color: var(--cc-raised) !important;
+    color: var(--cc-text) !important;
+}
+
+.compiler-page .language-select-wrap>svg,
+.compiler-page .console-title>svg,
+.compiler-page .console-tabs button.active {
+    color: var(--cc-secondary) !important;
+}
+
+.compiler-page .console-tabs button.active::after {
+    background: linear-gradient(90deg, var(--cc-primary), var(--cc-secondary)) !important;
+}
+
+.compiler-page .console-empty-icon,
+.compiler-page .action-note-icon {
+    border-color: var(--cc-border) !important;
+    background: var(--cc-raised) !important;
+    color: var(--cc-secondary) !important;
+}
+
+/* Login and signup */
+.auth-page {
+    --auth-bg: var(--cc-bg);
+    --auth-card: var(--cc-surface);
+    --auth-border: var(--cc-border);
+    --auth-muted: var(--cc-muted);
+    --auth-violet: var(--cc-primary);
+    --auth-cyan: var(--cc-secondary);
+
+    color: var(--cc-text);
+    background: var(--cc-bg) !important;
+}
+
+.auth-page .auth-showcase::after {
+    background: color-mix(in srgb, var(--cc-primary) 16%, transparent) !important;
+}
+
+.auth-page .auth-showcase::before {
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--cc-secondary) 5%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--cc-secondary) 5%, transparent) 1px, transparent 1px) !important;
+}
+
+.auth-page .auth-input-wrap {
+    border-color: var(--cc-border) !important;
+    background: var(--cc-surface) !important;
+}
+
+.auth-page .auth-input-wrap:focus-within {
+    border-color: var(--cc-secondary) !important;
+    box-shadow: 0 0 0 3px var(--cc-glow) !important;
+}
+
+/* Create room and join room */
+.room-page {
+    --room-bg: var(--cc-bg);
+    --room-panel: var(--cc-surface);
+    --room-border: var(--cc-border);
+    --room-muted: var(--cc-muted);
+    --room-violet: var(--cc-primary);
+    --room-cyan: var(--cc-secondary);
+
+    color: var(--cc-text);
+    background: var(--cc-bg) !important;
+}
+
+.room-page .room-form-card,
+.room-page .room-private-option,
+.room-page .room-field input,
+.room-page .room-switcher {
+    border-color: var(--cc-border) !important;
+}
+
+.room-page .room-form-card {
+    background:
+        radial-gradient(ellipse at 100% 0%,
+            color-mix(in srgb, var(--cc-primary) 12%, transparent),
+            transparent 48%),
+        var(--cc-surface) !important;
+}
+
+.room-page .room-field input {
+    background: var(--cc-bg) !important;
+    color: var(--cc-text) !important;
+}
+
+.room-page .room-switch-option.active {
+    border-color: var(--cc-border) !important;
+    background: color-mix(in srgb, var(--cc-primary) 18%, var(--cc-surface)) !important;
+    color: var(--cc-text) !important;
+}
+
+/* Settings page uses the same live theme tokens. */
+.settings-page {
+    background: var(--cc-bg, #07111F) !important;
+    color: var(--cc-text, #F1F5F9) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .site-shell *,
+    .dashboard-page *,
+    .compiler-page *,
+    .auth-page *,
+    .room-page *,
+    .settings-page * {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}

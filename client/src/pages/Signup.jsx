@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     ArrowLeft,
     ArrowRight,
@@ -7,6 +7,7 @@ import {
     Code2,
     Eye,
     EyeOff,
+    LoaderCircle,
     LockKeyhole,
     Mail,
     ShieldCheck,
@@ -14,7 +15,8 @@ import {
     UserRound,
     UsersRound,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useAuth } from "../AuthContext.jsx";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Auth.css";
 
 function SignupBrand() {
@@ -29,6 +31,13 @@ function SignupBrand() {
 }
 
 export default function Signup() {
+    const { register, isAuthenticated } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const searchParams = new URLSearchParams(location.search);
+    const redirectDestination = searchParams.get("redirect") || "/dashboard";
+
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -38,8 +47,15 @@ export default function Signup() {
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [message, setMessage] = useState("");
     const [isError, setIsError] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    function handleSubmit(event) {
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate(redirectDestination, { replace: true });
+        }
+    }, [isAuthenticated, navigate, redirectDestination]);
+
+    async function handleSubmit(event) {
         event.preventDefault();
         setMessage("");
         setIsError(false);
@@ -68,9 +84,16 @@ export default function Signup() {
             return;
         }
 
-        setMessage(
-            "Your form is valid. Account creation is not connected yet, so no account has been created."
-        );
+        setIsSubmitting(true);
+        const result = await register(name, email, password);
+        setIsSubmitting(false);
+
+        if (result.success) {
+            navigate(redirectDestination, { replace: true });
+        } else {
+            setIsError(true);
+            setMessage(result.error);
+        }
     }
 
     function clearMessage() {
@@ -305,8 +328,18 @@ export default function Signup() {
                             </span>
                         </label>
 
-                        <button className="auth-submit" type="submit">
-                            Create account <ArrowRight size={16} />
+                        <button className="auth-submit" type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <>
+                                    <LoaderCircle size={16} style={{ animation: "spin 1s linear infinite" }} />
+                                    <span>Creating account...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>Create account</span>
+                                    <ArrowRight size={16} />
+                                </>
+                            )}
                         </button>
 
                         {message && (

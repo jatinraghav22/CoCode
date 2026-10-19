@@ -1,19 +1,23 @@
-
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     ArrowLeft,
     ArrowRight,
+    CheckCircle2,
     Code2,
     Eye,
     EyeOff,
+    KeyRound,
+    LoaderCircle,
     LockKeyhole,
     Mail,
     ShieldCheck,
     Sparkles,
     Terminal,
     UsersRound,
+    Zap,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../AuthContext.jsx";
 import "./Auth.css";
 
 function AuthBrand() {
@@ -28,18 +32,59 @@ function AuthBrand() {
 }
 
 export default function Login() {
+    const { login, demoLogin, isAuthenticated } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const searchParams = new URLSearchParams(location.search);
+    const redirectDestination = searchParams.get("redirect") || "/dashboard";
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
     const [message, setMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    function handleSubmit(event) {
+    // If already authenticated, redirect to destination
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate(redirectDestination, { replace: true });
+        }
+    }, [isAuthenticated, navigate, redirectDestination]);
+
+    async function handleSubmit(event) {
         event.preventDefault();
+        setMessage("");
+        setIsSubmitting(true);
 
-        setMessage(
-            "Form validation passed. Authentication is not connected yet; you have not been signed in."
-        );
+        const result = await login(email, password);
+        setIsSubmitting(false);
+
+        if (result.success) {
+            navigate(redirectDestination, { replace: true });
+        } else {
+            setMessage(result.error);
+        }
+    }
+
+    async function handleDemoLogin() {
+        setMessage("");
+        setIsSubmitting(true);
+        const result = await demoLogin();
+        setIsSubmitting(false);
+
+        if (result.success) {
+            navigate(redirectDestination, { replace: true });
+        } else {
+            setMessage(result.error);
+        }
+    }
+
+    function handleAutoFillDemo() {
+        setEmail("demo@cocode.dev");
+        setPassword("password123");
+        setMessage("Demo credentials entered. Click 'Sign In' or 'Quick Demo Login'.");
     }
 
     return (
@@ -86,7 +131,7 @@ export default function Login() {
                             <span>
                                 <strong>Built for collaboration</strong>
                                 <small>
-                                    Explore room-based coding workflows.
+                                    Create and join persistent live coding rooms.
                                 </small>
                             </span>
                         </div>
@@ -96,9 +141,9 @@ export default function Login() {
                                 <ShieldCheck size={18} />
                             </span>
                             <span>
-                                <strong>Designed around your flow</strong>
+                                <strong>Authorized sessions</strong>
                                 <small>
-                                    A focused interface for developer productivity.
+                                    Cryptographically signed bearer tokens keep your rooms secure.
                                 </small>
                             </span>
                         </div>
@@ -125,20 +170,79 @@ export default function Login() {
                     <div className="auth-form-heading">
                         <div className="auth-eyebrow">ACCOUNT ACCESS</div>
                         <h2>
-                            Welcome back<span className="auth-gradient-text">.</span>
+                            Sign in to <span className="auth-gradient-text">CoCode</span>
                         </h2>
-                        <p>Enter your details to continue to your workspace.</p>
+                        <p>
+                            {redirectDestination !== "/dashboard"
+                                ? `Please sign in to access ${redirectDestination}.`
+                                : "Enter your credentials to enter your developer dashboard."}
+                        </p>
                     </div>
 
-                    <form
-                        className="auth-form"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            setMessage(
-                                "Form validation passed. Authentication is not connected yet; you have not been signed in."
-                            );
+                    {/* Quick Demo Access Card */}
+                    <div
+                        style={{
+                            background: "rgba(139, 92, 246, 0.12)",
+                            border: "1px solid rgba(139, 92, 246, 0.35)",
+                            borderRadius: 12,
+                            padding: "16px 18px",
+                            marginBottom: 20,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
                         }}
                     >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#c4b5fd", display: "flex", alignItems: "center", gap: 6 }}>
+                                <Zap size={15} color="#06b6d4" />
+                                Instant Demo Login
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleAutoFillDemo}
+                                style={{
+                                    fontSize: "0.75rem",
+                                    color: "#56e4ff",
+                                    textDecoration: "underline",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                }}
+                            >
+                                Auto-fill fields
+                            </button>
+                        </div>
+                        <div style={{ fontSize: "0.8rem", color: "#cbd5e1", lineHeight: 1.5 }}>
+                            <strong>Email:</strong> <code>demo@cocode.dev</code> <br />
+                            <strong>Password:</strong> <code>password123</code>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleDemoLogin}
+                            disabled={isSubmitting}
+                            style={{
+                                background: "linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                fontSize: "0.85rem",
+                                fontWeight: 700,
+                                cursor: isSubmitting ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 8,
+                                boxShadow: "0 0 16px rgba(139, 92, 246, 0.35)",
+                            }}
+                        >
+                            {isSubmitting ? <LoaderCircle size={15} style={{ animation: "spin 1s linear infinite" }} /> : <KeyRound size={15} />}
+                            <span>One-Click Demo Sign In</span>
+                        </button>
+                    </div>
+
+                    <form className="auth-form" onSubmit={handleSubmit}>
                         <div className="auth-field">
                             <label htmlFor="login-email">Email address</label>
                             <div className="auth-input-wrap">
@@ -147,7 +251,7 @@ export default function Login() {
                                     id="login-email"
                                     type="email"
                                     autoComplete="email"
-                                    placeholder="you@example.com"
+                                    placeholder="demo@cocode.dev"
                                     value={email}
                                     onChange={(event) => {
                                         setEmail(event.target.value);
@@ -200,7 +304,7 @@ export default function Login() {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "Password recovery will be available after authentication is implemented."
+                                        "For demo testing, use demo@cocode.dev / password123, or create a new account."
                                     )
                                 }
                             >
@@ -208,13 +312,27 @@ export default function Login() {
                             </button>
                         </div>
 
-                        <button className="auth-submit" type="submit">
-                            Sign in <ArrowRight size={16} />
+                        <button className="auth-submit" type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <>
+                                    <LoaderCircle size={16} style={{ animation: "spin 1s linear infinite" }} />
+                                    <span>Signing in...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>Sign in</span>
+                                    <ArrowRight size={16} />
+                                </>
+                            )}
                         </button>
 
                         {message && (
                             <div className="auth-feedback" role="status">
-                                <ShieldCheck size={16} />
+                                {message.includes("entered") || message.includes("successful") ? (
+                                    <CheckCircle2 size={16} style={{ color: "#10b981" }} />
+                                ) : (
+                                    <ShieldCheck size={16} style={{ color: "#f43f5e" }} />
+                                )}
                                 <span>{message}</span>
                             </div>
                         )}
@@ -224,13 +342,13 @@ export default function Login() {
 
                     <Link className="auth-submit" to="/compiler">
                         <Terminal size={16} />
-                        Open public compiler
+                        Open public compiler (Guest access)
                         <ArrowRight size={16} />
                     </Link>
 
                     <p className="auth-switch">
                         New to CoCode?
-                        <Link to="/signup">Create an account</Link>
+                        <Link to={`/signup${location.search}`}>Create an account</Link>
                     </p>
 
                     <div className="auth-footer-links">

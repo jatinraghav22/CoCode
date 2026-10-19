@@ -1,5 +1,5 @@
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import {
     AlertCircle,
@@ -12,45 +12,104 @@ import {
     LoaderCircle,
     Play,
     RotateCcw,
+    Sparkles,
     Terminal,
+    Trash2,
     Zap,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import "./Compiler.css";
+
+const SAMPLE_PROGRAMS = {
+    python: {
+        hello: {
+            title: "Hello World",
+            code: 'name = input("Enter your name: ") or "Developer"\nprint(f"Hello, {name}! Welcome to CoCode.")\n',
+            stdin: "Developer",
+        },
+        factorial: {
+            title: "Factorial",
+            code: 'def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\nval = int(input("Enter number: ") or 6)\nprint(f"Factorial of {val} is: {factorial(val)}")\n',
+            stdin: "6",
+        },
+        fibonacci: {
+            title: "Fibonacci",
+            code: 'def fibonacci(limit):\n    a, b = 0, 1\n    series = []\n    for _ in range(limit):\n        series.append(a)\n        a, b = b, a + b\n    return series\n\nprint("First 10 Fibonacci numbers:")\nprint(fibonacci(10))\n',
+            stdin: "",
+        },
+        prime: {
+            title: "Prime Check",
+            code: 'def is_prime(num):\n    if num < 2:\n        return False\n    for i in range(2, int(num**0.5) + 1):\n        if num % i == 0:\n            return False\n    return True\n\ntest = int(input("Enter integer: ") or 29)\nprint(f"Is {test} prime? -> {is_prime(test)}")\n',
+            stdin: "29",
+        },
+    },
+    javascript: {
+        hello: {
+            title: "Hello World",
+            code: 'const name = "Developer";\nconsole.log(`Hello, ${name}! Welcome to CoCode.`);\n',
+            stdin: "",
+        },
+        factorial: {
+            title: "Factorial",
+            code: 'function factorial(n) {\n    if (n <= 1) return 1;\n    return n * factorial(n - 1);\n}\n\nconst num = 6;\nconsole.log(`Factorial of ${num} is: ${factorial(num)}`);\n',
+            stdin: "",
+        },
+        fibonacci: {
+            title: "Fibonacci",
+            code: 'function getFibonacci(count) {\n    const sequence = [0, 1];\n    for (let i = 2; i < count; i++) {\n        sequence.push(sequence[i - 1] + sequence[i - 2]);\n    }\n    return sequence.slice(0, count);\n}\n\nconsole.log("First 10 Fibonacci numbers:", getFibonacci(10));\n',
+            stdin: "",
+        },
+        prime: {
+            title: "Prime Check",
+            code: 'function isPrime(val) {\n    if (val < 2) return false;\n    for (let i = 2; i <= Math.sqrt(val); i++) {\n        if (val % i === 0) return false;\n    }\n    return true;\n}\n\nconst testNum = 29;\nconsole.log(`Is ${testNum} prime? -> ${isPrime(testNum)}`);\n',
+            stdin: "",
+        },
+    },
+    cpp: {
+        hello: {
+            title: "Hello World",
+            code: '#include <iostream>\n\nint main() {\n    std::cout << "Hello, World! Welcome to CoCode." << std::endl;\n    return 0;\n}\n',
+            stdin: "",
+        },
+        factorial: {
+            title: "Factorial",
+            code: '#include <iostream>\n\nlong long factorial(int n) {\n    if (n <= 1) return 1;\n    return n * factorial(n - 1);\n}\n\nint main() {\n    int n = 6;\n    std::cout << "Factorial of " << n << " is: " << factorial(n) << std::endl;\n    return 0;\n}\n',
+            stdin: "",
+        },
+        fibonacci: {
+            title: "Fibonacci",
+            code: '#include <iostream>\n#include <vector>\n\nint main() {\n    int n = 10;\n    std::vector<long long> fib = {0, 1};\n    for (int i = 2; i < n; ++i) {\n        fib.push_back(fib[i - 1] + fib[i - 2]);\n    }\n    std::cout << "Fibonacci sequence: ";\n    for (auto v : fib) std::cout << v << " ";\n    std::cout << std::endl;\n    return 0;\n}\n',
+            stdin: "",
+        },
+        prime: {
+            title: "Prime Check",
+            code: '#include <iostream>\n#include <cmath>\n\nbool isPrime(int n) {\n    if (n < 2) return false;\n    for (int i = 2; i <= std::sqrt(n); ++i) {\n        if (n % i == 0) return false;\n    }\n    return true;\n}\n\nint main() {\n    int n = 29;\n    std::cout << "Is " << n << " prime? -> " << (isPrime(n) ? "Yes" : "No") << std::endl;\n    return 0;\n}\n',
+            stdin: "",
+        },
+    },
+};
 
 const LANGUAGES = {
     python: {
         label: "Python",
         editorLanguage: "python",
         file: "main.py",
-        starterCode:
-            'name = input("Enter your name: ")\n' +
-            'print(f"Hello, {name}! Welcome to CoCode.")\n',
-        starterInput: "Developer",
+        starterCode: SAMPLE_PROGRAMS.python.hello.code,
+        starterInput: SAMPLE_PROGRAMS.python.hello.stdin,
     },
     javascript: {
         label: "JavaScript",
         editorLanguage: "javascript",
         file: "main.js",
-        starterCode:
-            'const name = "Developer";\n' +
-            'console.log(`Hello, ${name}! Welcome to CoCode.`);\n',
-        starterInput: "",
+        starterCode: SAMPLE_PROGRAMS.javascript.hello.code,
+        starterInput: SAMPLE_PROGRAMS.javascript.hello.stdin,
     },
     cpp: {
         label: "C++",
         editorLanguage: "cpp",
         file: "main.cpp",
-        starterCode:
-            "#include <iostream>\n" +
-            "#include <string>\n\n" +
-            "int main() {\n" +
-            '    const std::string name = "Developer";\n' +
-            '    std::cout << "Hello, " << name\n' +
-            '              << "! Welcome to CoCode!" << std::endl;\n' +
-            "    return 0;\n" +
-            "}\n",
-        starterInput: "",
+        starterCode: SAMPLE_PROGRAMS.cpp.hello.code,
+        starterInput: SAMPLE_PROGRAMS.cpp.hello.stdin,
     },
 };
 
@@ -147,7 +206,9 @@ function Compiler() {
     }
 
     // Keep the latest handler available to Monaco's keyboard shortcut.
-    runHandler.current = runCode;
+    useEffect(() => {
+        runHandler.current = runCode;
+    });
 
     function handleEditorMount(editor, monaco) {
         defineEditorTheme(monaco);
@@ -156,6 +217,36 @@ function Compiler() {
             monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
             () => runHandler.current?.()
         );
+    }
+
+    function loadSampleProgram(key) {
+        const sample = SAMPLE_PROGRAMS[language]?.[key];
+        if (sample) {
+            setCodes((current) => ({
+                ...current,
+                [language]: sample.code,
+            }));
+            setInputs((current) => ({
+                ...current,
+                [language]: sample.stdin,
+            }));
+            setResult(null);
+            setExecutionError("");
+            setActivePanel("output");
+        }
+    }
+
+    function clearCode() {
+        setCodes((current) => ({
+            ...current,
+            [language]: "",
+        }));
+        setInputs((current) => ({
+            ...current,
+            [language]: "",
+        }));
+        setResult(null);
+        setExecutionError("");
     }
 
     function resetCode() {
@@ -237,21 +328,44 @@ function Compiler() {
                             <i />
                         </div>
 
-                        <label className="language-select-wrap">
-                            <Code2 size={15} />
-                            <select
-                                aria-label="Programming language"
-                                value={language}
-                                onChange={(event) => changeLanguage(event.target.value)}
-                            >
-                                {Object.entries(LANGUAGES).map(([key, item]) => (
-                                    <option key={key} value={key}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown size={14} />
-                        </label>
+                        <div className="compiler-toolbar-right">
+                            <label className="language-select-wrap sample-select-wrap">
+                                <Sparkles size={14} />
+                                <select
+                                    aria-label="Load sample program"
+                                    defaultValue=""
+                                    onChange={(event) => {
+                                        if (event.target.value) {
+                                            loadSampleProgram(event.target.value);
+                                            event.target.value = "";
+                                        }
+                                    }}
+                                >
+                                    <option value="" disabled>Sample Programs...</option>
+                                    <option value="hello">Hello World</option>
+                                    <option value="factorial">Factorial</option>
+                                    <option value="fibonacci">Fibonacci</option>
+                                    <option value="prime">Prime Check</option>
+                                </select>
+                                <ChevronDown size={14} />
+                            </label>
+
+                            <label className="language-select-wrap">
+                                <Code2 size={15} />
+                                <select
+                                    aria-label="Programming language"
+                                    value={language}
+                                    onChange={(event) => changeLanguage(event.target.value)}
+                                >
+                                    {Object.entries(LANGUAGES).map(([key, item]) => (
+                                        <option key={key} value={key}>
+                                            {item.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={14} />
+                            </label>
+                        </div>
                     </div>
 
                     <div className="compiler-editor-container">
@@ -492,7 +606,11 @@ function Compiler() {
                 </div>
 
                 <div className="compiler-buttons">
-                    <button className="reset-code-button" type="button" onClick={resetCode}>
+                    <button className="reset-code-button" type="button" onClick={clearCode} title="Clear code and terminal">
+                        <Trash2 size={15} />
+                        Clear
+                    </button>
+                    <button className="reset-code-button" type="button" onClick={resetCode} title="Reset starter code">
                         <RotateCcw size={15} />
                         Reset
                     </button>

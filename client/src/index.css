@@ -1,7 +1,6 @@
 :root {
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-
-  color: #f4f5ff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #f8fafc;
   background: #080914;
   color-scheme: dark;
   font-synthesis: none;
@@ -9,37 +8,88 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* CoCode design tokens */
+  /* ==========================================================================
+     CoCode Design System Tokens
+     ========================================================================== */
+
+  /* Surface & Background Colors */
   --bg-primary: #080914;
-  --bg-secondary: #0e1020;
-  --bg-card: rgba(17, 19, 38, 0.78);
+  --bg-secondary: #0d0f22;
+  --bg-surface: #12152e;
+  --bg-card: rgba(18, 21, 46, 0.72);
+  --bg-card-hover: rgba(26, 30, 62, 0.85);
+  --bg-card-active: rgba(33, 38, 77, 0.9);
+  --bg-glass: rgba(13, 15, 34, 0.75);
+  --bg-glass-elevated: rgba(22, 26, 56, 0.85);
+  --bg-code: #0b0d1b;
 
-  --text-primary: #f4f5ff;
-  --text-secondary: #a1a6c3;
-  --text-muted: #777f9e;
+  /* Typography Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-light: #cbd5e1;
+  --text-invert: #080914;
 
-  --accent-violet: #9875ff;
-  --accent-purple: #7847ff;
-  --accent-cyan: #56e4ff;
-  --accent-green: #48e2a0;
-  --accent-red: #ff6b86;
+  /* Neon & Electric Brand Accents */
+  --accent-violet: #8b5cf6;
+  --accent-purple: #7c3aed;
+  --accent-cyan: #06b6d4;
+  --accent-blue: #3b82f6;
+  --accent-magenta: #ec4899;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
 
-  --border-default: rgba(170, 173, 229, 0.13);
-  --border-glow: rgba(152, 117, 255, 0.42);
+  /* Borders & Glows */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(139, 92, 246, 0.22);
+  --border-hover: rgba(139, 92, 246, 0.48);
+  --border-glow: rgba(6, 182, 212, 0.45);
+  --border-card: rgba(255, 255, 255, 0.09);
 
+  /* Linear Gradients */
+  --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+  --gradient-secondary: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  --gradient-full: linear-gradient(135deg, #ec4899 0%, #8b5cf6 45%, #06b6d4 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 100%);
+  --gradient-glow: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, rgba(6, 182, 212, 0.05) 50%, transparent 70%);
+
+  /* Shadows & Depth */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-glow-violet: 0 0 35px -5px rgba(139, 92, 246, 0.35);
+  --shadow-glow-cyan: 0 0 35px -5px rgba(6, 182, 212, 0.35);
+  --shadow-card: 0 12px 36px -8px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+
+  /* Border Radii */
+  --radius-xs: 6px;
   --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
 
-  --shadow-glow:
-    0 0 45px rgba(120, 71, 255, 0.13),
-    0 24px 80px rgba(0, 0, 0, 0.32);
+  /* Font Families */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
 
-  --font-code: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /* Transitions */
+  --transition-fast: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-* {
+/* ==========================================================================
+   CSS Reset & Base Rules
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html {
@@ -47,6 +97,7 @@ html {
   min-height: 100%;
   scroll-behavior: smooth;
   background: var(--bg-primary);
+  font-size: 16px;
 }
 
 body {
@@ -55,64 +106,176 @@ body {
   margin: 0;
   background: var(--bg-primary);
   color: var(--text-primary);
-}
-
-body,
-button,
-input,
-textarea,
-select {
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
-}
-
-button,
-input,
-textarea,
-select {
-  font-size: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--accent-cyan);
-  outline-offset: 4px;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-::selection {
-  color: #fff;
-  background: rgba(120, 71, 255, 0.65);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-@media (prefers-reduced-motion: reduce) {
+/* Typography Defaults */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
 
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
+p {
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+button, input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  border: none;
+  outline: none;
+  background: none;
+}
+
+button {
+  cursor: pointer;
+  user-select: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+code, pre, kbd {
+  font-family: var(--font-mono);
+}
+
+/* Selection */
+::selection {
+  background: rgba(139, 92, 246, 0.45);
+  color: #ffffff;
+}
+
+/* Focus States for Accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 3px;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080914;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e2246;
+  border-radius: 9999px;
+  border: 2px solid #080914;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #323970;
+}
+
+/* ==========================================================================
+   Global Helper & Utility Classes
+   ========================================================================== */
+
+/* Text Gradients */
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.gradient-text-accent {
+  background: var(--gradient-full);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* Ambient Glow Orbs */
+.ambient-glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.45;
+}
+
+/* Glass Card */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+.glass-panel:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card), var(--shadow-glow-violet);
+}
+
+/* Badges */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #c4b5fd;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+
+.badge-pill .badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Accessibility Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

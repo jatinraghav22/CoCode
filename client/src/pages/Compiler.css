@@ -280,6 +280,21 @@
     color: #f1f0ff;
 }
 
+.compiler-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sample-select-wrap {
+    color: var(--accent-cyan);
+}
+
+.sample-select-wrap select {
+    width: 140px;
+}
+
 .language-select-wrap>svg:last-child {
     color: #858eaf;
     pointer-events: none;
