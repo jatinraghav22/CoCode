@@ -1,0 +1,161 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String         @id @default(uuid())
+  name         String
+  username     String?        @unique
+  email        String         @unique
+  passwordHash String
+  avatarUrl    String?
+  bio          String?        @db.Text
+  role         String         @default("User")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  projects     Project[]
+  settings     UserSetting?
+  activities   ActivityLog[]
+  executions   ExecutionRecord[]
+}
+
+model Project {
+  id          String         @id @default(uuid())
+  name        String
+  description String?        @db.Text
+  isPublic    Boolean        @default(false)
+  ownerId     String
+  owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  files       ProjectFile[]
+  executions  ExecutionRecord[]
+
+  @@index([ownerId])
+}
+
+model ProjectFile {
+  id        String         @id @default(uuid())
+  projectId String
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId  String?
+  name      String
+  path      String
+  isFolder  Boolean        @default(false)
+  content   String?        @db.LongText
+  language  String?        @default("javascript")
+  size      Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  revisions FileRevision[]
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@index([parentId])
+}
+
+model FileRevision {
+  id         String      @id @default(uuid())
+  fileId     String
+  file       ProjectFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  content    String      @db.LongText
+  authorId   String?
+  authorName String?
+  summary    String?
+  createdAt  DateTime    @default(now())
+
+  @@index([fileId])
+}
+
+model ExecutionRecord {
+  id            String   @id @default(uuid())
+  projectId     String?
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  language      String
+  sourceCode    String   @db.LongText
+  stdin         String?  @db.Text
+  stdout        String?  @db.LongText
+  stderr        String?  @db.LongText
+  compileOutput String?  @db.LongText
+  status        String   @default("Finished")
+  time          Float?
+  memory        Int?
+  createdAt     DateTime @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model CollaborationRoom {
+  id        String       @id @default(uuid())
+  code      String       @unique
+  name      String
+  hostId    String
+  hostName  String
+  isPrivate Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  members   RoomMember[]
+  messages  ChatMessage[]
+}
+
+model RoomMember {
+  id         String            @id @default(uuid())
+  roomId     String
+  room       CollaborationRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId     String?
+  userName   String
+  role       String            @default("member")
+  joinedAt   DateTime          @default(now())
+  lastActive DateTime          @default(now())
+
+  @@index([roomId])
+}
+
+model ChatMessage {
+  id         String            @id @default(uuid())
+  roomId     String
+  room       CollaborationRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId   String?
+  senderName String
+  text       String            @db.Text
+  createdAt  DateTime          @default(now())
+
+  @@index([roomId])
+}
+
+model UserSetting {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme     String   @default("vs-dark")
+  fontSize  Int      @default(14)
+  tabSize   Int      @default(2)
+  wordWrap  String   @default("on")
+  minimap   Boolean  @default(true)
+  autoSave  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  details   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

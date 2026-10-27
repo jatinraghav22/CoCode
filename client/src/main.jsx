@@ -12,6 +12,7 @@ import "./theme-arctic.css";
 
 import App from "./App.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import EditorPage from "./pages/EditorPage.jsx";
 import Compiler from "./pages/Compiler.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
@@ -40,6 +41,10 @@ createRoot(document.getElementById("root")).render(
 
             {/* Standalone Public Compiler (Available to both guests and users) */}
             <Route path="/compiler" element={<Compiler />} />
+
+            {/* Professional Online IDE matching reference: /editor and /editor/:roomId */}
+            <Route path="/editor" element={<EditorPage />} />
+            <Route path="/editor/:roomId" element={<EditorPage />} />
 
             {/* Authentication Pages (Redirect to dashboard/intended action if logged in) */}
             <Route path="/login" element={<Login />} />

@@ -183,7 +183,7 @@ export default function Dashboard() {
   }
 
   function handleOpenProject(proj) {
-    navigate(`/compiler?project=${encodeURIComponent(proj.name)}&lang=${encodeURIComponent(proj.language)}`);
+    navigate(`/editor?project=${encodeURIComponent(proj.name)}&lang=${encodeURIComponent(proj.language)}`);
   }
 
   const firstName = user?.name ? user.name.split(" ")[0] : "Jatin";

@@ -320,12 +320,12 @@ export default function RoomPage({ mode = "create" }) {
 
                                         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                                             <Link
-                                                to="/compiler"
+                                                to={`/editor/${createdCode}`}
                                                 className="room-primary-button"
                                                 style={{ flex: 1, textDecoration: "none" }}
                                             >
                                                 <Code2 size={16} />
-                                                <span>Open in Compiler</span>
+                                                <span>Launch Online IDE</span>
                                             </Link>
                                             <button
                                                 type="button"
@@ -426,6 +426,20 @@ export default function RoomPage({ mode = "create" }) {
                                     <X size={16} style={{ color: "#f43f5e", flexShrink: 0 }} />
                                 )}
                                 <span>{message}</span>
+                            </div>
+                        )}
+
+                        {!isCreate && isSuccess && (
+                            <div style={{ marginTop: 12 }}>
+                                <Link
+                                    to={`/editor/${roomCode.trim().toUpperCase()}`}
+                                    className="room-primary-button"
+                                    style={{ textDecoration: "none" }}
+                                >
+                                    <Code2 size={16} />
+                                    <span>Enter Room IDE</span>
+                                    <ArrowRight size={16} />
+                                </Link>
                             </div>
                         )}
 
