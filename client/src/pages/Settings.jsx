@@ -44,25 +44,40 @@ export default function Settings({ defaultTab = "profile" }) {
   const [activeTab, setActiveTab] = useState(initialTab);
 
   // Form State
-  const [name, setName] = useState(user?.name || "Jatin Raghav");
-  const [username, setUsername] = useState(user?.username || "jatin-raghav");
-  const [phone, setPhone] = useState(user?.phone || "+91 9876543210");
-  const [locationField, setLocationField] = useState(user?.location || "Ghaziabad, India");
-  const [bio, setBio] = useState(
-    user?.bio || "Full Stack Developer • Cloud Computing Enthusiast • DSA in C++"
-  );
+  const [name, setName] = useState(user?.name || "");
+  const [username, setUsername] = useState(user?.username || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [locationField, setLocationField] = useState(user?.location || "");
+  const [bio, setBio] = useState(user?.bio || "");
   const [skillsText, setSkillsText] = useState(
-    Array.isArray(user?.skills) && user.skills.length > 0
-      ? user.skills.join(", ")
-      : "C++, Python, JavaScript, HTML, CSS, React.js, Node.js, MongoDB, Git/GitHub"
+    Array.isArray(user?.skills) && user.skills.length > 0 ? user.skills.join(", ") : ""
   );
-  const [github, setGithub] = useState(user?.socialLinks?.github || "jatinraghav22");
-  const [linkedin, setLinkedin] = useState(user?.socialLinks?.linkedin || "jatin-raghav-a9a060357");
-  const [portfolio, setPortfolio] = useState(user?.socialLinks?.portfolio || "https://jatinraghav.vercel.app/");
-  const [avatarUrl, setAvatarUrl] = useState(
-    user?.avatarUrl ||
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80"
-  );
+  const [github, setGithub] = useState(user?.socialLinks?.github || "");
+  const [linkedin, setLinkedin] = useState(user?.socialLinks?.linkedin || "");
+  const [portfolio, setPortfolio] = useState(user?.socialLinks?.portfolio || "");
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
+
+  // Update form fields when user profile loads or changes
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "");
+      setUsername(user.username || "");
+      setPhone(user.phone || "");
+      setLocationField(user.location || "");
+      setBio(user.bio || "");
+      if (Array.isArray(user.skills)) {
+        setSkillsText(user.skills.join(", "));
+      }
+      if (user.socialLinks) {
+        setGithub(user.socialLinks.github || "");
+        setLinkedin(user.socialLinks.linkedin || "");
+        setPortfolio(user.socialLinks.portfolio || "");
+      }
+      if (user.avatarUrl) {
+        setAvatarUrl(user.avatarUrl);
+      }
+    }
+  }, [user]);
 
   // Status & Feedback
   const [isSaving, setIsSaving] = useState(false);
@@ -394,7 +409,7 @@ export default function Settings({ defaultTab = "profile" }) {
                           id="input-email"
                           type="email"
                           className="form-input input-disabled"
-                          value={user?.email || "jatinraghav22@gmail.com"}
+                          value={user?.email || ""}
                           disabled
                           title="Contact support to update your registered email address"
                         />
@@ -509,7 +524,7 @@ export default function Settings({ defaultTab = "profile" }) {
                           className="form-input"
                           value={github}
                           onChange={(e) => setGithub(e.target.value)}
-                          placeholder="jatinraghav22"
+                          placeholder="e.g. octocat"
                           disabled={isSaving}
                         />
                       </div>
@@ -524,7 +539,7 @@ export default function Settings({ defaultTab = "profile" }) {
                           className="form-input"
                           value={linkedin}
                           onChange={(e) => setLinkedin(e.target.value)}
-                          placeholder="jatin-raghav-a9a060357"
+                          placeholder="e.g. dev-user"
                           disabled={isSaving}
                         />
                       </div>
@@ -539,7 +554,7 @@ export default function Settings({ defaultTab = "profile" }) {
                           className="form-input"
                           value={portfolio}
                           onChange={(e) => setPortfolio(e.target.value)}
-                          placeholder="https://jatinraghav.vercel.app/"
+                          placeholder="https://yourportfolio.com"
                           disabled={isSaving}
                         />
                       </div>

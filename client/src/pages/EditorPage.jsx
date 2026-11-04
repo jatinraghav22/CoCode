@@ -188,7 +188,7 @@ export default function EditorPage() {
   ]);
   const [chatInput, setChatInput] = useState("");
   const [collaborators, setCollaborators] = useState([
-    { id: user?.id || "u-current", name: user?.name || "Jatin Raghav", role: "Host", online: true }
+    { id: user?.id || "u-current", name: user?.name || "Developer", role: "Host", online: true }
   ]);
 
   const editorRef = useRef(null);
@@ -591,7 +591,7 @@ export default function EditorPage() {
     const newMsg = {
       id: `msg-${Date.now()}`,
       senderId: user?.id || "u-current",
-      senderName: user?.name || "Jatin Raghav",
+      senderName: user?.name || "Developer",
       text: chatInput.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };

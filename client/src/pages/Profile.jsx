@@ -77,18 +77,18 @@ export default function Profile() {
     user?.avatarUrl ||
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80";
 
-  const memberSince = user?.memberSince || "Oct 2025";
+  const memberSince = user?.memberSince || "Recently";
   const role = user?.role || "User";
-  const joinedRoomsCount = 1;
+  const joinedRoomsCount = 0;
 
   const skillsList = Array.isArray(user?.skills) && user.skills.length > 0
     ? user.skills
-    : ["C++", "Python", "JavaScript", "HTML", "CSS", "React.js", "Node.js", "MongoDB", "Git/GitHub"];
+    : [];
 
   const socialLinks = user?.socialLinks || {
-    github: "jatinraghav22",
-    linkedin: "jatin-raghav-a9a060357",
-    portfolio: "https://jatinraghav.vercel.app/",
+    github: "",
+    linkedin: "",
+    portfolio: "",
   };
 
   const githubUrl = socialLinks.github
@@ -145,14 +145,14 @@ export default function Profile() {
                   />
                 ) : null}
                 <span className="hero-avatar-fallback">
-                  {(user?.name || "Jatin Raghav").slice(0, 1)}
+                  {(user?.name || "User").slice(0, 1)}
                 </span>
                 <span className="hero-avatar-status" title="Status: Active" />
               </div>
 
               <div className="hero-user-details">
                 <div className="hero-name-row">
-                  <h2 className="hero-user-name">{user?.name || "Jatin Raghav"}</h2>
+                  <h2 className="hero-user-name">{user?.name || "User"}</h2>
                   <span className="hero-status-pill">
                     <span className="status-glow-dot" />
                     Active
@@ -162,11 +162,11 @@ export default function Profile() {
                 <div className="hero-contact-row">
                   <div className="hero-meta-item">
                     <Mail size={14} className="meta-icon" />
-                    <span>{user?.email || "jatinraghav22@gmail.com"}</span>
+                    <span>{user?.email || ""}</span>
                   </div>
                   <div className="hero-meta-item">
                     <AtSign size={14} className="meta-icon" />
-                    <span>@{user?.username || "jatin-raghav"}</span>
+                    <span>@{user?.username || (user?.name ? user.name.toLowerCase().replace(/[^a-z0-9]/g, "-") : "user")}</span>
                   </div>
                 </div>
               </div>
@@ -234,17 +234,17 @@ export default function Profile() {
               <div className="info-fields-list">
                 <div className="info-field-row">
                   <span className="field-label">Full Name</span>
-                  <strong className="field-value">{user?.name || "Jatin Raghav"}</strong>
+                  <strong className="field-value">{user?.name || "User"}</strong>
                 </div>
 
                 <div className="info-field-row">
                   <span className="field-label">Email Address</span>
-                  <strong className="field-value">{user?.email || "jatinraghav22@gmail.com"}</strong>
+                  <strong className="field-value">{user?.email || ""}</strong>
                 </div>
 
                 <div className="info-field-row">
                   <span className="field-label">Username</span>
-                  <strong className="field-value">@{user?.username || "jatin-raghav"}</strong>
+                  <strong className="field-value">@{user?.username || (user?.name ? user.name.toLowerCase().replace(/[^a-z0-9]/g, "-") : "user")}</strong>
                 </div>
 
                 <div className="info-field-row">

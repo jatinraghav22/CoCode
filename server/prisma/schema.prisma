@@ -8,35 +8,44 @@ generator client {
 }
 
 model User {
-  id           String         @id @default(uuid())
+  id           String            @id @default(uuid())
   name         String
-  username     String?        @unique
-  email        String         @unique
+  username     String?           @unique
+  email        String            @unique
   passwordHash String
   avatarUrl    String?
-  bio          String?        @db.Text
-  role         String         @default("User")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  bio          String?           @db.Text
+  phone        String?
+  location     String?
+  skills       String?           @db.Text
+  socialLinks  String?           @db.Text
+  role         String            @default("User")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
-  projects     Project[]
-  settings     UserSetting?
-  activities   ActivityLog[]
-  executions   ExecutionRecord[]
+  projects      Project[]
+  settings      UserSetting?
+  activities    ActivityLog[]
+  executions    ExecutionRecord[]
+  sessions      CodingSession[]
+  languageStats LanguageStat[]
+  progress      UserProgress?
 }
 
 model Project {
-  id          String         @id @default(uuid())
+  id          String            @id @default(uuid())
   name        String
-  description String?        @db.Text
-  isPublic    Boolean        @default(false)
+  description String?           @db.Text
+  language    String            @default("javascript")
+  isPublic    Boolean           @default(false)
   ownerId     String
-  owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   files       ProjectFile[]
   executions  ExecutionRecord[]
+  sessions    CodingSession[]
 
   @@index([ownerId])
 }
@@ -94,6 +103,47 @@ model ExecutionRecord {
 
   @@index([projectId])
   @@index([userId])
+}
+
+model CodingSession {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  language  String?
+  duration  Int       @default(0) // duration in seconds
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([startedAt])
+}
+
+model LanguageStat {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language  String
+  count     Int      @default(0)
+  timeSpent Int      @default(0) // duration in seconds
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, language])
+  @@index([userId])
+}
+
+model UserProgress {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalLinesRun  Int       @default(0)
+  totalRuns      Int       @default(0)
+  streakDays     Int       @default(0)
+  lastActiveDate DateTime?
+  updatedAt      DateTime  @updatedAt
 }
 
 model CollaborationRoom {

@@ -306,7 +306,7 @@ export default function Navbar({ onSearchChange, searchValue = "" }) {
                   <User size={14} />
                 </div>
                 <div className="result-info">
-                  <strong>View Profile ({user?.name || "Jatin"})</strong>
+                  <strong>View Profile ({user?.name || "User"})</strong>
                   <span>Bio, skills, connected accounts</span>
                 </div>
               </Link>
@@ -406,12 +406,12 @@ export default function Navbar({ onSearchChange, searchValue = "" }) {
                   />
                 ) : null}
                 <span className="avatar-fallback">
-                  {(user?.name || "Jatin Raghav").slice(0, 1)}
+                  {(user?.name || "User").slice(0, 1)}
                 </span>
                 <span className="avatar-status-dot" />
               </div>
               <span className="profile-display-name">
-                {user?.name || "Jatin Raghav"}
+                {user?.name || "User"}
               </span>
               <ChevronDown
                 size={14}
@@ -439,15 +439,15 @@ export default function Navbar({ onSearchChange, searchValue = "" }) {
                       }}
                     />
                     <span className="avatar-fallback">
-                      {(user?.name || "Jatin Raghav").slice(0, 1)}
+                      {(user?.name || "User").slice(0, 1)}
                     </span>
                   </div>
                   <div className="dropdown-user-info">
                     <div className="dropdown-user-name">
-                      {user?.name || "Jatin Raghav"}
+                      {user?.name || "User"}
                     </div>
                     <div className="dropdown-user-email">
-                      {user?.email || "jatinraghav22@gmail.com"}
+                      {user?.email || ""}
                     </div>
                   </div>
                 </div>
@@ -527,8 +527,8 @@ export default function Navbar({ onSearchChange, searchValue = "" }) {
               <span className="avatar-status-dot" />
             </div>
             <div className="mobile-user-details">
-              <strong>{user?.name || "Jatin Raghav"}</strong>
-              <span>{user?.email || "jatinraghav22@gmail.com"}</span>
+              <strong>{user?.name || "User"}</strong>
+              <span>{user?.email || ""}</span>
             </div>
           </div>
 

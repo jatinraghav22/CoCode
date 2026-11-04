@@ -32,6 +32,7 @@ import {
   Code2,
   Clock,
 } from "lucide-react";
+import { useAuth } from "../AuthContext.jsx";
 import "./Compiler.css";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
@@ -227,6 +228,7 @@ function isRunnableLanguage(lang) {
 }
 
 export default function Compiler() {
+  const { token } = useAuth();
   // Activity Bar Tab: 'files' | 'search' | 'history' | 'run' | 'ai' | 'analytics' | 'settings' | 'devtools'
   const [activeActivityTab, setActiveActivityTab] = useState("files");
 
@@ -762,9 +764,14 @@ export default function Compiler() {
     const startTime = Date.now();
 
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/api/compiler/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           sourceCode: activeFile.content || "",
           language: activeFile.language,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FolderGit2,
@@ -16,95 +16,67 @@ import {
   Trash2,
   Copy,
   FolderPlus,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { useAuth } from "../AuthContext.jsx";
 import "./Dashboard.css";
 
-const PROJECTS_STORAGE_KEY = "cocode-dashboard-projects-v1";
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-const DEFAULT_PROJECTS = [
-  {
-    id: "proj-1",
-    name: "Calculator App",
-    language: "Python",
-    iconType: "calc",
-    updatedText: "2 days ago",
-    updatedAt: Date.now() - 2 * DAY_MS,
-    description: "Scientific calculation module with CLI interface",
-  },
-  {
-    id: "proj-2",
-    name: "Weather App",
-    language: "JavaScript",
-    iconType: "weather",
-    updatedText: "4 days ago",
-    updatedAt: Date.now() - 4 * DAY_MS,
-    description: "Forecast tracker with geolocation & OpenWeather integration",
-  },
-  {
-    id: "proj-3",
-    name: "Portfolio Website",
-    language: "HTML",
-    iconType: "web",
-    updatedText: "5 days ago",
-    updatedAt: Date.now() - 5 * DAY_MS,
-    description: "Modern developer portfolio with responsive dark theme",
-  },
-];
-
-const POPULAR_LANGUAGES = [
-  { name: "Python", percentage: 32, color: "#38bdf8", icon: "🐍" },
-  { name: "JavaScript", percentage: 26, color: "#facc15", icon: "⚡" },
-  { name: "C++", percentage: 15, color: "#60a5fa", icon: "⚙️" },
-  { name: "Java", percentage: 12, color: "#c084fc", icon: "☕" },
-  { name: "Others", percentage: 15, color: "#94a3b8", icon: "📦" },
-];
-
-function readStoredProjects() {
-  if (typeof window === "undefined") return DEFAULT_PROJECTS;
-  try {
-    const raw = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (!raw) {
-      window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(DEFAULT_PROJECTS));
-      return DEFAULT_PROJECTS;
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(DEFAULT_PROJECTS));
-      return DEFAULT_PROJECTS;
-    }
-    return parsed;
-  } catch {
-    return DEFAULT_PROJECTS;
-  }
-}
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
-  const [projects, setProjects] = useState(readStoredProjects);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
   const [activeProjectMenu, setActiveProjectMenu] = useState(null);
 
   // New project form state
   const [newProjName, setNewProjName] = useState("");
-  const [newProjLang, setNewProjLang] = useState("Python");
+  const [newProjLang, setNewProjLang] = useState("JavaScript");
   const [newProjDesc, setNewProjDesc] = useState("");
 
   const menuRef = useRef(null);
 
-  // Sync projects with localStorage
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
-    } catch {
-      // Ignore quota errors
+  // Fetch live dashboard statistics from database
+  const fetchDashboard = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
     }
-  }, [projects]);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load dashboard data (status ${response.status})`);
+      }
+
+      const data = await response.json();
+      setDashboardData(data);
+      setError(null);
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      setError(err.message || "Failed to load dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   // Close 3-dots menus when clicking outside
   useEffect(() => {
@@ -116,6 +88,8 @@ export default function Dashboard() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const projects = dashboardData?.recentProjects || [];
 
   // Filter projects by search query
   const filteredProjects = useMemo(() => {
@@ -129,72 +103,154 @@ export default function Dashboard() {
     );
   }, [projects, searchQuery]);
 
-  // Total unique languages used
-  const languagesUsedCount = useMemo(() => {
-    const langs = new Set(projects.map((p) => p.language));
-    langs.add("Python");
-    langs.add("JavaScript");
-    langs.add("C++");
-    langs.add("HTML");
-    langs.add("CSS");
-    return langs.size;
-  }, [projects]);
-
-  function handleCreateProject(e) {
+  // Create Project via backend API
+  async function handleCreateProject(e) {
     e.preventDefault();
-    if (!newProjName.trim()) return;
+    if (!newProjName.trim() || !token) return;
 
-    let icon = "code";
-    if (newProjLang === "Python") icon = "calc";
-    else if (newProjLang === "JavaScript") icon = "weather";
-    else if (newProjLang === "HTML" || newProjLang === "CSS") icon = "web";
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newProjName.trim(),
+          language: newProjLang,
+          description: newProjDesc.trim(),
+        }),
+      });
 
-    const newProject = {
-      id: `proj-${Date.now()}`,
-      name: newProjName.trim(),
-      language: newProjLang,
-      iconType: icon,
-      updatedText: "Just now",
-      updatedAt: Date.now(),
-      description: newProjDesc.trim() || `${newProjLang} coding project`,
-    };
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to create project");
+      }
 
-    setProjects((prev) => [newProject, ...prev]);
-    setNewProjName("");
-    setNewProjDesc("");
-    setNewProjectModalOpen(false);
+      setNewProjName("");
+      setNewProjDesc("");
+      setNewProjectModalOpen(false);
+      await fetchDashboard();
+    } catch (err) {
+      alert(err.message || "Failed to create project.");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
-  function handleDeleteProject(id) {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    setActiveProjectMenu(null);
+  // Delete Project via backend API
+  async function handleDeleteProject(id) {
+    if (!token) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to delete project.");
+      }
+
+      setActiveProjectMenu(null);
+      await fetchDashboard();
+    } catch (err) {
+      alert(err.message || "Failed to delete project.");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
-  function handleDuplicateProject(proj) {
-    const duplicate = {
-      ...proj,
-      id: `proj-${Date.now()}`,
-      name: `${proj.name} (Copy)`,
-      updatedText: "Just now",
-      updatedAt: Date.now(),
-    };
-    setProjects((prev) => [duplicate, ...prev]);
-    setActiveProjectMenu(null);
+  // Duplicate Project via backend API
+  async function handleDuplicateProject(proj) {
+    if (!token) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: `${proj.name} (Copy)`,
+          language: proj.language,
+          description: proj.description || "",
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to duplicate project.");
+      }
+
+      setActiveProjectMenu(null);
+      await fetchDashboard();
+    } catch (err) {
+      alert(err.message || "Failed to duplicate project.");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   function handleOpenProject(proj) {
-    navigate(`/editor?project=${encodeURIComponent(proj.name)}&lang=${encodeURIComponent(proj.language)}`);
+    navigate(`/editor?projectId=${proj.id}&project=${encodeURIComponent(proj.name)}&lang=${encodeURIComponent(proj.language)}`);
   }
 
-  const firstName = user?.name ? user.name.split(" ")[0] : "Jatin";
+  // Real user greeting
+  const actualName = user?.name || dashboardData?.user?.name || "Developer";
+  const firstName = actualName.trim().split(" ")[0] || "Developer";
+
+  // Real stats
+  const stats = dashboardData?.stats || {
+    totalProjects: 0,
+    activeRooms: 0,
+    todayActivityMinutes: 0,
+    languagesUsedCount: 0,
+  };
+
+  // Format today's activity string
+  const formattedTodayActivity = useMemo(() => {
+    const mins = stats.todayActivityMinutes || 0;
+    if (mins === 0) return "0 minutes";
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+  }, [stats.todayActivityMinutes]);
+
+  const popularLanguages = dashboardData?.popularLanguages || [];
 
   return (
     <div className="dashboard-page-wrapper">
-      {/* Clean Top Navigation Bar with Branding, Global Search, Notifications, Theme Toggle, Profile Dropdown */}
+      {/* Top Navigation Bar with Branding, Search, Notifications, Theme Toggle, Profile Dropdown */}
       <Navbar onSearchChange={setSearchQuery} searchValue={searchQuery} />
 
       <main className="dashboard-main-content">
         <div className="dashboard-container">
+          {/* Error Banner */}
+          {error && (
+            <div className="dashboard-error-banner glass-panel">
+              <div className="error-banner-content">
+                <AlertCircle size={20} className="text-rose" />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-retry"
+                onClick={() => {
+                  setLoading(true);
+                  fetchDashboard();
+                }}
+              >
+                <RefreshCw size={14} />
+                <span>Retry</span>
+              </button>
+            </div>
+          )}
+
           {/* =================================================================
               1. WELCOME HERO SECTION
               ================================================================= */}
@@ -202,7 +258,11 @@ export default function Dashboard() {
             <div className="welcome-left-column">
               <div className="welcome-text-wrap">
                 <h1 className="welcome-greeting">
-                  Welcome back, {firstName}! 👋
+                  {loading ? (
+                    <span className="greeting-skeleton" />
+                  ) : (
+                    `Welcome back, ${firstName}! 👋`
+                  )}
                 </h1>
                 <p className="welcome-motivational">
                   Keep coding, keep growing. You're doing great!
@@ -218,7 +278,9 @@ export default function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-label">Total Projects</span>
-                    <strong className="stat-value">{projects.length}</strong>
+                    <strong className="stat-value">
+                      {loading ? "..." : stats.totalProjects}
+                    </strong>
                   </div>
                 </div>
 
@@ -229,7 +291,9 @@ export default function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-label">Active Rooms</span>
-                    <strong className="stat-value">1</strong>
+                    <strong className="stat-value">
+                      {loading ? "..." : stats.activeRooms}
+                    </strong>
                   </div>
                 </div>
 
@@ -240,7 +304,9 @@ export default function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-label">Today's Activity</span>
-                    <strong className="stat-value">2h 24m</strong>
+                    <strong className="stat-value">
+                      {loading ? "..." : formattedTodayActivity}
+                    </strong>
                   </div>
                 </div>
 
@@ -251,7 +317,9 @@ export default function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-label">Languages Used</span>
-                    <strong className="stat-value">{languagesUsedCount}</strong>
+                    <strong className="stat-value">
+                      {loading ? "..." : stats.languagesUsedCount}
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -260,11 +328,9 @@ export default function Dashboard() {
             {/* Glowing 3D / Isometric Hero Laptop Graphic */}
             <div className="welcome-hero-graphic" aria-hidden="true">
               <div className="floating-laptop-stage">
-                {/* Ambient glow backgrounds */}
                 <div className="hero-glow-sphere cyan-glow" />
                 <div className="hero-glow-sphere violet-glow" />
 
-                {/* Holographic Floating Code Badges */}
                 <div className="hologram-chip chip-one">
                   <code>&lt; / &gt;</code>
                 </div>
@@ -278,7 +344,6 @@ export default function Dashboard() {
                   <span className="chip-lang-badge">Py</span>
                 </div>
 
-                {/* Isometric Laptop Graphic */}
                 <div className="isometric-laptop">
                   <div className="laptop-screen">
                     <div className="screen-header">
@@ -374,15 +439,27 @@ export default function Dashboard() {
                   className="card-header-link"
                   onClick={() => setNewProjectModalOpen(true)}
                 >
-                  <span>View all</span>
-                  <ArrowRight size={14} />
+                  <Plus size={14} />
+                  <span>New</span>
                 </button>
               </div>
 
               <div className="projects-list-wrap">
-                {filteredProjects.length === 0 ? (
+                {loading ? (
+                  <div className="dashboard-skeleton-list">
+                    <div className="skeleton-project-row" />
+                    <div className="skeleton-project-row" />
+                    <div className="skeleton-project-row" />
+                  </div>
+                ) : filteredProjects.length === 0 ? (
                   <div className="empty-projects-state">
-                    <p>No projects match your search.</p>
+                    <div className="empty-icon-wrap">
+                      <FolderGit2 size={36} className="text-muted-cyan" />
+                    </div>
+                    <strong className="empty-title">No projects yet</strong>
+                    <p className="empty-desc">
+                      No projects yet. Start your first coding project!
+                    </p>
                     <button
                       type="button"
                       className="btn-create-first"
@@ -433,6 +510,7 @@ export default function Dashboard() {
                             )
                           }
                           aria-label="Project actions"
+                          disabled={actionLoading}
                         >
                           <MoreVertical size={16} />
                         </button>
@@ -444,6 +522,7 @@ export default function Dashboard() {
                               type="button"
                               className="menu-option-item"
                               onClick={() => handleDuplicateProject(project)}
+                              disabled={actionLoading}
                             >
                               <Copy size={14} />
                               <span>Duplicate</span>
@@ -452,6 +531,7 @@ export default function Dashboard() {
                               type="button"
                               className="menu-option-item delete-option"
                               onClick={() => handleDeleteProject(project.id)}
+                              disabled={actionLoading}
                             >
                               <Trash2 size={14} />
                               <span>Remove</span>
@@ -470,32 +550,54 @@ export default function Dashboard() {
               <div className="card-header-bar">
                 <h2 className="card-header-heading">Popular Languages</h2>
                 <Link to="/compiler" className="card-header-link">
-                  <span>View all</span>
+                  <span>Open Compiler</span>
                   <ArrowRight size={14} />
                 </Link>
               </div>
 
               <div className="languages-breakdown-list">
-                {POPULAR_LANGUAGES.map((item) => (
-                  <div key={item.name} className="language-row-item">
-                    <div className="language-info-left">
-                      <span className="language-icon-emoji">{item.icon}</span>
-                      <strong className="language-name">{item.name}</strong>
-                    </div>
-
-                    <div className="language-bar-track">
-                      <div
-                        className="language-bar-fill"
-                        style={{
-                          width: `${item.percentage}%`,
-                          backgroundColor: item.color,
-                        }}
-                      />
-                    </div>
-
-                    <div className="language-percentage">{item.percentage}%</div>
+                {loading ? (
+                  <div className="dashboard-skeleton-list">
+                    <div className="skeleton-lang-row" />
+                    <div className="skeleton-lang-row" />
+                    <div className="skeleton-lang-row" />
                   </div>
-                ))}
+                ) : popularLanguages.length === 0 ? (
+                  <div className="empty-languages-state">
+                    <div className="empty-icon-wrap">
+                      <Code2 size={36} className="text-muted-purple" />
+                    </div>
+                    <strong className="empty-title">No language activity yet</strong>
+                    <p className="empty-desc">
+                      Start coding in the compiler or create projects to see your programming language statistics!
+                    </p>
+                    <Link to="/compiler" className="btn-start-coding">
+                      <Terminal size={14} />
+                      <span>Start Coding</span>
+                    </Link>
+                  </div>
+                ) : (
+                  popularLanguages.map((item) => (
+                    <div key={item.name} className="language-row-item">
+                      <div className="language-info-left">
+                        <span className="language-icon-emoji">{item.icon}</span>
+                        <strong className="language-name">{item.name}</strong>
+                      </div>
+
+                      <div className="language-bar-track">
+                        <div
+                          className="language-bar-fill"
+                          style={{
+                            width: `${item.percentage}%`,
+                            backgroundColor: item.color,
+                          }}
+                        />
+                      </div>
+
+                      <div className="language-percentage">{item.percentage}%</div>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </div>
@@ -546,9 +648,11 @@ export default function Dashboard() {
                   value={newProjLang}
                   onChange={(e) => setNewProjLang(e.target.value)}
                 >
-                  <option value="Python">Python</option>
                   <option value="JavaScript">JavaScript</option>
+                  <option value="Python">Python</option>
                   <option value="C++">C++</option>
+                  <option value="C">C</option>
+                  <option value="Java">Java</option>
                   <option value="HTML">HTML / CSS</option>
                 </select>
               </div>
@@ -565,8 +669,12 @@ export default function Dashboard() {
               </div>
 
               <div className="modal-actions-row">
-                <button type="submit" className="btn-modal-create">
-                  Create Project
+                <button
+                  type="submit"
+                  className="btn-modal-create"
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? "Creating..." : "Create Project"}
                 </button>
                 <button
                   type="button"
