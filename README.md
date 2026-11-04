@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://cocode-two.vercel.app/">Live Demo</a> •
+  <a href="https://https://getcocode.vercel.app/">Live Demo</a> •
   <a href="https://github.com/jatinraghav22/CoCode">GitHub Repository</a> •
   <a href="https://cocode-2l13.onrender.com/">Backend API</a>
 </p>
@@ -161,7 +161,7 @@ CoCode is deployed using the following platforms:
 
 | Component | Platform | Link |
 |---|---|---|
-| Frontend | Vercel | https://cocode-two.vercel.app/ |
+| Frontend | Vercel | https://getcocode.vercel.app/ |
 | Backend | Render | https://cocode-2l13.onrender.com/ |
 | Source Code | GitHub | https://github.com/jatinraghav22/CoCode |
 
