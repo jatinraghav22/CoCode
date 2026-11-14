@@ -108,52 +108,74 @@ npm install
 
 ### 5. Configure Environment Variables
 
-Create the required `.env` files for the backend and frontend.
+Create the required `.env` file in the `server/` directory (see `server/.env.example` for reference).
 
-Configure your database connection, JWT secret, server port, and frontend API URL according to your local environment.
+Environment variables:
 
-Example database connection:
+| Variable | Description | Example / Default |
+|---|---|---|
+| `DATABASE_URL` | MySQL connection string | `mysql://USER:PASSWORD@localhost:3306/cocode_db` |
+| `PORT` | Backend server port | `5000` |
+| `NODE_ENV` | Environment mode | `development` (or `production`, `test`) |
+| `JWT_SECRET` | Secret for signing JWTs (min 32 chars) | Random 32+ char secret |
+| `JWT_EXPIRES_IN` | JWT token lifetime | `7d` |
+| `JWT_ISSUER` | JWT issuer claim (`iss`) | `cocode-api` |
+| `JWT_AUDIENCE` | JWT audience claim (`aud`) | `cocode-client` |
+| `CLIENT_URL` | Allowed CORS origins (comma-separated) | `http://localhost:5173,https://getcocode.vercel.app` |
+| `JUDGE0_BASE_URL` | Judge0 compiler endpoint | `https://ce.judge0.com` |
 
-```env
-DATABASE_URL="mysql://USER:PASSWORD@localhost:3306/cocode_db"
-JWT_SECRET="your_secret_key"
-PORT=5000
-```
+*Never commit `.env` files or hardcode secrets in source code.*
 
-Do not commit your actual environment variables or secrets to GitHub.
+### 6. Configure Database & Migrations
 
-### 6. Configure Prisma
-
-From the server directory, run:
+From the `server/` directory:
 
 ```bash
+cd server
 npx prisma generate
-npx prisma db push
+npx prisma migrate dev
 ```
 
-Make sure MySQL is running and the database has been created.
+### 7. Run Automated Tests
 
-### 7. Start the Application
+Run the comprehensive unit, static security, and integration test suite:
 
-Start the backend and frontend in separate terminals using their respective development scripts.
+```bash
+cd server
+npm test
+```
+
+### 8. Start the Application
+
+Start backend and frontend in separate terminals:
 
 Backend:
-
 ```bash
 cd server
 npm run dev
 ```
 
 Frontend:
-
 ```bash
 cd client
 npm run dev
 ```
 
-Open the local frontend URL displayed by Vite in your browser.
+Open your browser to `http://localhost:5173`.
 
-*Note: Ensure the development scripts and environment variable names match your package configuration.*
+## Authentication & Security Architecture
+
+CoCode Phase 2 implements enterprise-grade authentication and API hardening:
+
+- **Database-Backed Session Revocation:** While JWTs are stateless, CoCode persists hashed tokens (`SHA-256`) in MySQL (`AuthSession` table). Logout marks the session as revoked, preventing token reuse before expiration.
+- **Single & Multi-Device Logout:**
+  - `POST /api/auth/logout`: Revokes the current device session.
+  - `POST /api/auth/logout-all`: Revokes all active sessions for the user.
+- **Collision-Proof Tokens:** Each token includes a cryptographic `jti` (UUID), ensuring uniqueness even during rapid successive logins.
+- **Strict Claims Verification:** Tokens are verified for signature, expiry, `iss` (`cocode-api`), and `aud` (`cocode-client`).
+- **Cryptographic Password Hashing:** Node.js `crypto.scrypt` with unique cryptographically random salts and timing-safe comparisons.
+- **Authenticated Socket.IO:** Real-time collaboration sockets require a valid, non-revoked JWT during handshake (`io.use(socketAuth)`). Identity is loaded from the database, preventing client spoofing.
+- **Rate Limiting & Protection:** Endpoint-specific rate limiting (`express-rate-limit`) on login (20/15m) and registration (10/1h), plus security headers (`helmet`) and origin-restricted CORS.
 
 ## Deployment
 

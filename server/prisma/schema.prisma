@@ -30,6 +30,7 @@ model User {
   sessions      CodingSession[]
   languageStats LanguageStat[]
   progress      UserProgress?
+  authSessions  AuthSession[]
 }
 
 model Project {
@@ -208,4 +209,24 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ─── Auth Session Model ────────────────────────────────────────────────────────
+// Tracks active JWT sessions for database-backed revocation.
+// We store a SHA-256 hash of the token — never the raw JWT.
+// When a user logs out, revokedAt is set. requireAuth checks this table.
+model AuthSession {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique             // SHA-256 hash of the JWT
+  expiresAt   DateTime                      // mirrors the JWT exp claim
+  revokedAt   DateTime?                     // null = active, non-null = revoked
+  createdAt   DateTime  @default(now())
+  userAgent   String?   @db.Text            // optional: browser/client info
+  ipAddress   String?                       // optional: client IP at login
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
 }

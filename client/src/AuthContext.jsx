@@ -38,6 +38,9 @@ export function AuthProvider({ children }) {
         });
 
         if (!response.ok) {
+          // If the session was revoked (e.g., logged out from another device),
+          // the server returns 401 with code "SESSION_REVOKED".
+          // We clear local storage and redirect to login silently.
           throw new Error("Session invalid");
         }
 
@@ -135,6 +138,28 @@ export function AuthProvider({ children }) {
     setToken(null);
   }
 
+  // Logout from all devices — revokes every active session for this account.
+  // After calling this, every other device where the user is logged in will
+  // get a 401 "Session revoked" response on their next API call and be redirected to login.
+  async function logoutAll() {
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/auth/logout-all`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch {
+        // Proceed with local logout even if the request fails
+      }
+    }
+
+    window.localStorage.removeItem(TOKEN_KEY);
+    setUser(null);
+    setToken(null);
+  }
+
   async function updateProfile(profileData) {
     if (!token) {
       return { success: false, error: "Authentication required to update profile." };
@@ -195,6 +220,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    logoutAll,
     updateProfile,
     refreshProfile,
     demoLogin,
