@@ -1,4 +1,4 @@
-﻿# CoCode Project Tracker
+# CoCode Project Tracker
 
 ## Project
 CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
@@ -28,7 +28,7 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 |---|---|---|
 | 0 | Repository and frontend audit | Complete |
 | 1 | Backend V2 foundation and health API | Complete |
-| 2 | TiDB and Prisma connection | Pending |
+| 2 | TiDB and Prisma connection | Complete |
 | 3 | Authentication and user model | Pending |
 | 4 | Profile and account APIs | Pending |
 | 5 | User-specific dashboard APIs | Pending |
