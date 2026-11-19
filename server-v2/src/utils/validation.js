@@ -150,9 +150,149 @@ function validateLoginInput(body) {
   };
 }
 
+/**
+ * Validates profile update input payload.
+ * Only 'name' is permitted to be updated.
+ *
+ * @param {Object} body
+ * @returns {{ isValid: boolean, error?: string, normalized?: { name: string } }}
+ */
+function validateUpdateProfileInput(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      isValid: false,
+      error: "Request body must be a valid JSON object.",
+    };
+  }
+
+  const keys = Object.keys(body);
+  if (keys.length === 0) {
+    return {
+      isValid: false,
+      error: "At least one field to update is required.",
+    };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "email")) {
+    return {
+      isValid: false,
+      error: "Email cannot be updated through this endpoint.",
+    };
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(body, "password") ||
+    Object.prototype.hasOwnProperty.call(body, "passwordHash") ||
+    Object.prototype.hasOwnProperty.call(body, "currentPassword") ||
+    Object.prototype.hasOwnProperty.call(body, "newPassword")
+  ) {
+    return {
+      isValid: false,
+      error: "Password cannot be updated through this endpoint.",
+    };
+  }
+
+  const allowedFields = ["name"];
+  const unexpected = keys.filter((key) => !allowedFields.includes(key));
+  if (unexpected.length > 0) {
+    return {
+      isValid: false,
+      error: `Unexpected field: '${unexpected[0]}'. Only permitted fields can be updated.`,
+    };
+  }
+
+  const { name } = body;
+  if (typeof name !== "string" || name.trim().length < 2) {
+    return {
+      isValid: false,
+      error: "Name must be at least 2 characters.",
+    };
+  }
+
+  if (name.trim().length > 50) {
+    return {
+      isValid: false,
+      error: "Name cannot exceed 50 characters.",
+    };
+  }
+
+  return {
+    isValid: true,
+    normalized: {
+      name: name.trim(),
+    },
+  };
+}
+
+/**
+ * Validates change password input payload.
+ *
+ * @param {Object} body
+ * @returns {{ isValid: boolean, error?: string, normalized?: { currentPassword: string, newPassword: string } }}
+ */
+function validateChangePasswordInput(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      isValid: false,
+      error: "Request body must be a valid JSON object.",
+    };
+  }
+
+  const keys = Object.keys(body);
+  const allowedFields = ["currentPassword", "newPassword"];
+  const unexpected = keys.filter((key) => !allowedFields.includes(key));
+  if (unexpected.length > 0) {
+    return {
+      isValid: false,
+      error: `Unexpected field: '${unexpected[0]}'. Only currentPassword and newPassword are permitted.`,
+    };
+  }
+
+  const { currentPassword, newPassword } = body;
+
+  if (!currentPassword || typeof currentPassword !== "string") {
+    return {
+      isValid: false,
+      error: "Current password is required.",
+    };
+  }
+
+  if (!newPassword || typeof newPassword !== "string") {
+    return {
+      isValid: false,
+      error: "New password is required.",
+    };
+  }
+
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.isValid) {
+    return {
+      isValid: false,
+      error: passwordValidation.message,
+    };
+  }
+
+  if (currentPassword === newPassword) {
+    return {
+      isValid: false,
+      error: "New password cannot be the same as the current password.",
+    };
+  }
+
+  return {
+    isValid: true,
+    normalized: {
+      currentPassword,
+      newPassword,
+    },
+  };
+}
+
 module.exports = {
   validateEmail,
   validatePassword,
   validateRegisterInput,
   validateLoginInput,
+  validateUpdateProfileInput,
+  validateChangePasswordInput,
 };

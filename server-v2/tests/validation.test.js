@@ -5,6 +5,8 @@ const {
   validatePassword,
   validateRegisterInput,
   validateLoginInput,
+  validateUpdateProfileInput,
+  validateChangePasswordInput,
 } = require("../src/utils/validation");
 
 test("Validation - validateEmail", () => {
@@ -101,4 +103,95 @@ test("Validation - validateLoginInput", () => {
 
   const missingPassword = validateLoginInput({ email: "user@domain.com" });
   assert.equal(missingPassword.isValid, false);
+});
+
+test("Validation - validateUpdateProfileInput", () => {
+  // Valid update
+  const valid = validateUpdateProfileInput({ name: "  Ada Lovelace  " });
+  assert.equal(valid.isValid, true);
+  assert.equal(valid.normalized.name, "Ada Lovelace");
+
+  // Non-object
+  assert.equal(validateUpdateProfileInput(null).isValid, false);
+  assert.equal(validateUpdateProfileInput([]).isValid, false);
+  assert.equal(validateUpdateProfileInput("string").isValid, false);
+
+  // Empty object
+  const empty = validateUpdateProfileInput({});
+  assert.equal(empty.isValid, false);
+  assert.match(empty.error, /At least one field to update is required/);
+
+  // Reject email modification
+  const withEmail = validateUpdateProfileInput({ name: "Ada", email: "new@example.com" });
+  assert.equal(withEmail.isValid, false);
+  assert.match(withEmail.error, /Email cannot be updated/);
+
+  // Reject password modification
+  const withPass = validateUpdateProfileInput({ name: "Ada", password: "NewPassword123" });
+  assert.equal(withPass.isValid, false);
+  assert.match(withPass.error, /Password cannot be updated/);
+
+  // Reject unexpected fields
+  const withUnexpected = validateUpdateProfileInput({ name: "Ada", role: "admin" });
+  assert.equal(withUnexpected.isValid, false);
+  assert.match(withUnexpected.error, /Unexpected field/);
+
+  // Invalid name length
+  const shortName = validateUpdateProfileInput({ name: "A" });
+  assert.equal(shortName.isValid, false);
+  assert.match(shortName.error, /at least 2 characters/);
+
+  const longName = validateUpdateProfileInput({ name: "A".repeat(51) });
+  assert.equal(longName.isValid, false);
+  assert.match(longName.error, /cannot exceed 50 characters/);
+});
+
+test("Validation - validateChangePasswordInput", () => {
+  // Valid
+  const valid = validateChangePasswordInput({
+    currentPassword: "OldPassword123",
+    newPassword: "NewPassword456",
+  });
+  assert.equal(valid.isValid, true);
+  assert.equal(valid.normalized.currentPassword, "OldPassword123");
+  assert.equal(valid.normalized.newPassword, "NewPassword456");
+
+  // Non-object
+  assert.equal(validateChangePasswordInput(null).isValid, false);
+  assert.equal(validateChangePasswordInput("string").isValid, false);
+
+  // Missing currentPassword
+  const noCurrent = validateChangePasswordInput({ newPassword: "NewPassword456" });
+  assert.equal(noCurrent.isValid, false);
+  assert.match(noCurrent.error, /Current password is required/);
+
+  // Missing newPassword
+  const noNew = validateChangePasswordInput({ currentPassword: "OldPassword123" });
+  assert.equal(noNew.isValid, false);
+  assert.match(noNew.error, /New password is required/);
+
+  // Reusing current password
+  const same = validateChangePasswordInput({
+    currentPassword: "SamePassword123",
+    newPassword: "SamePassword123",
+  });
+  assert.equal(same.isValid, false);
+  assert.match(same.error, /New password cannot be the same as the current password/);
+
+  // Weak new password
+  const weak = validateChangePasswordInput({
+    currentPassword: "OldPassword123",
+    newPassword: "weak",
+  });
+  assert.equal(weak.isValid, false);
+  assert.match(weak.error, /Password must be at least 8 characters/);
+
+  // Unexpected fields
+  const unexpected = validateChangePasswordInput({
+    currentPassword: "OldPassword123",
+    newPassword: "NewPassword456",
+    extra: "hacker",
+  });
+  assert.equal(unexpected.isValid, false);
+  assert.match(unexpected.error, /Unexpected field/);
 });

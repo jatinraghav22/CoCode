@@ -8,9 +8,18 @@ const { verifyAccessToken, extractBearerToken } = require("../utils/jwt");
  * @param {Object} options.prisma - PrismaClient instance.
  * @param {string} [options.jwtIssuer] - Expected JWT issuer.
  * @param {string} [options.jwtAudience] - Expected JWT audience.
+ * @param {number} [options.userNotFoundStatus=401] - Status code when user is not found in database.
+ * @param {string} [options.userNotFoundMessage="User account no longer exists."] - Message when user is not found.
  * @returns {Function} Express middleware function.
  */
-function createAuthMiddleware({ jwtSecret, prisma, jwtIssuer, jwtAudience }) {
+function createAuthMiddleware({
+  jwtSecret,
+  prisma,
+  jwtIssuer,
+  jwtAudience,
+  userNotFoundStatus = 401,
+  userNotFoundMessage = "User account no longer exists.",
+}) {
   if (!jwtSecret) {
     throw new Error("createAuthMiddleware requires jwtSecret.");
   }
@@ -74,10 +83,10 @@ function createAuthMiddleware({ jwtSecret, prisma, jwtIssuer, jwtAudience }) {
       });
 
       if (!user) {
-        return res.status(401).json({
+        return res.status(userNotFoundStatus).json({
           success: false,
-          message: "User account no longer exists.",
-          error: "User account no longer exists.",
+          message: userNotFoundMessage,
+          error: userNotFoundMessage,
         });
       }
 

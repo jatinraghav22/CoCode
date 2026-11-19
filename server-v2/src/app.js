@@ -3,6 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const { prisma: defaultPrisma } = require("./config/prisma");
 const { createAuthRouter } = require("./routes/auth.routes");
+const { createUserRouter } = require("./routes/user.routes");
 
 function createApp(config, dependencies = {}) {
   const app = express();
@@ -56,6 +57,15 @@ function createApp(config, dependencies = {}) {
   });
 
   app.use("/api/auth", authRouter);
+
+  const userRouter = createUserRouter({
+    config: resolvedConfig,
+    prisma,
+    userService: dependencies.userService,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/users", userRouter);
 
   app.use((req, res) => {
     res.status(404).json({

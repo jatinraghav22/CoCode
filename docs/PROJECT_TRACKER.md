@@ -30,7 +30,7 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 | 1 | Backend V2 foundation and health API | Complete |
 | 2 | TiDB and Prisma connection | Complete |
 | 3 | Authentication and user model | Complete |
-| 4 | Profile and account APIs | Pending |
+| 4 | Profile and account APIs | Complete |
 | 5 | User-specific dashboard APIs | Pending |
 | 6 | Projects and file management | Pending |
 | 7 | Judge0 compiler integration | Pending |
@@ -54,3 +54,10 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 - Security: In-memory sliding window rate limiting on auth endpoints, input validation (name, RFC 5322 email, password strength), generic invalid credentials on login failure, sub claim user ID, safe user projections (passwordHash never exposed).
 - Testing: Comprehensive test suite using Node.js built-in test runner with 27 tests passing (including TiDB Cloud integration).
 - Documentation: Detailed API documentation created in `server-v2/docs/AUTH_API.md`.
+
+## Phase 4 Notes
+- Complete Profile & Account Management API implemented in `server-v2/` with safe user projections and strict input validation.
+- Endpoints: `GET /api/users/me`, `PATCH /api/users/me`, `PATCH /api/users/me/password`.
+- Security: Requires JWT bearer authentication; user identity strictly derived from `req.userId` (preventing IDOR and cross-user tampering); strict allowlists rejecting unexpected update fields; email cannot be changed; passwords securely updated via bcryptjs (10 rounds); current password verification; password reuse prevention; passwords and password hashes never exposed.
+- Testing: Comprehensive automated test suite in `server-v2/tests/user.test.js` covering all 16 specified requirements + edge cases, plus `server-v2/tests/user.tidb.test.js` TiDB integration test. Full test suite has 46 tests passing (with 2 network-dependent TiDB integration tests safely skipped when offline).
+- Documentation: Detailed API documentation created in `server-v2/docs/USER_API.md`.
