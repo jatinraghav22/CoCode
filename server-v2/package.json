@@ -9,7 +9,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/env.js && node --check src/config/prisma.js && node --check src/utils/jwt.js && node --check src/utils/validation.js && node --check src/middleware/rateLimiter.js && node --check src/middleware/auth.js && node --check src/modules/auth/auth.service.js && node --check src/modules/auth/auth.controller.js && node --check src/routes/auth.routes.js && node --check src/modules/users/user.service.js && node --check src/modules/users/user.controller.js && node --check src/routes/user.routes.js"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/env.js && node --check src/config/prisma.js && node --check src/config/languages.js && node --check src/utils/jwt.js && node --check src/utils/validation.js && node --check src/middleware/rateLimiter.js && node --check src/middleware/auth.js && node --check src/modules/auth/auth.service.js && node --check src/modules/auth/auth.controller.js && node --check src/routes/auth.routes.js && node --check src/modules/users/user.service.js && node --check src/modules/users/user.controller.js && node --check src/routes/user.routes.js && node --check src/modules/compiler/compiler.validation.js && node --check src/modules/compiler/judge0.service.js && node --check src/modules/compiler/compiler.service.js && node --check src/modules/compiler/compiler.controller.js && node --check src/routes/compiler.routes.js"
   },
   "engines": {
     "node": ">=20"

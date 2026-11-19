@@ -39,6 +39,13 @@ function loadEnv() {
   const jwtIssuer = process.env.JWT_ISSUER || "cocode-backend-v2";
   const jwtAudience = process.env.JWT_AUDIENCE || "cocode-client";
 
+  const judge0BaseUrl = (process.env.JUDGE0_BASE_URL || "https://ce.judge0.com").replace(/\/+$/, "");
+  const judge0ApiKey = process.env.JUDGE0_API_KEY || process.env.JUDGE0_AUTH_TOKEN || null;
+  const judge0TimeoutMs = Number(process.env.JUDGE0_TIMEOUT_MS || 10000);
+  const judge0PollIntervalMs = Number(process.env.JUDGE0_POLL_INTERVAL_MS || 750);
+  const judge0MaxPollAttempts = Number(process.env.JUDGE0_MAX_POLL_ATTEMPTS || 15);
+  const judge0UseBase64 = process.env.JUDGE0_USE_BASE64 !== "false";
+
   return Object.freeze({
     nodeEnv,
     port,
@@ -47,6 +54,12 @@ function loadEnv() {
     jwtExpiresIn,
     jwtIssuer,
     jwtAudience,
+    judge0BaseUrl,
+    judge0ApiKey,
+    judge0TimeoutMs,
+    judge0PollIntervalMs,
+    judge0MaxPollAttempts,
+    judge0UseBase64,
   });
 }
 

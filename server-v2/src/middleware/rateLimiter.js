@@ -9,6 +9,14 @@ function createRateLimiter(options = {}) {
     options.message ||
     "Too many requests from this IP address. Please try again later.";
   const skip = typeof options.skip === "function" ? options.skip : () => false;
+  const keyGenerator =
+    typeof options.keyGenerator === "function"
+      ? options.keyGenerator
+      : (req) =>
+          req.ip ||
+          req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+          req.socket?.remoteAddress ||
+          "127.0.0.1";
 
   const hits = new Map();
 
@@ -31,21 +39,17 @@ function createRateLimiter(options = {}) {
       return next();
     }
 
-    const ip =
-      req.ip ||
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket?.remoteAddress ||
-      "127.0.0.1";
+    const key = keyGenerator(req);
 
     const now = Date.now();
-    let record = hits.get(ip);
+    let record = hits.get(key);
 
     if (!record || now > record.resetTime) {
       record = {
         count: 1,
         resetTime: now + windowMs,
       };
-      hits.set(ip, record);
+      hits.set(key, record);
     } else {
       record.count += 1;
     }

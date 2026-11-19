@@ -4,6 +4,7 @@ const helmet = require("helmet");
 const { prisma: defaultPrisma } = require("./config/prisma");
 const { createAuthRouter } = require("./routes/auth.routes");
 const { createUserRouter } = require("./routes/user.routes");
+const { createCompilerRouter } = require("./routes/compiler.routes");
 
 function createApp(config, dependencies = {}) {
   const app = express();
@@ -66,6 +67,16 @@ function createApp(config, dependencies = {}) {
   });
 
   app.use("/api/users", userRouter);
+
+  const compilerRouter = createCompilerRouter({
+    config: resolvedConfig,
+    prisma,
+    compilerService: dependencies.compilerService,
+    judge0Service: dependencies.judge0Service,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/compiler", compilerRouter);
 
   app.use((req, res) => {
     res.status(404).json({
