@@ -1,9 +1,21 @@
-﻿const express = require("express");
+const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const { prisma: defaultPrisma } = require("./config/prisma");
+const { createAuthRouter } = require("./routes/auth.routes");
 
-function createApp(config) {
+function createApp(config, dependencies = {}) {
   const app = express();
+
+  const resolvedConfig = {
+    jwtSecret: "cocode_dev_jwt_secret_must_be_at_least_32_chars_long!",
+    jwtExpiresIn: "7d",
+    jwtIssuer: "cocode-backend-v2",
+    jwtAudience: "cocode-client",
+    ...config,
+  };
+
+  const prisma = dependencies.prisma || defaultPrisma;
 
   app.disable("x-powered-by");
 
@@ -13,7 +25,7 @@ function createApp(config) {
     cors({
       origin(origin, callback) {
         // Allow requests without an Origin header, such as health checks.
-        if (!origin || config.clientOrigins.includes(origin)) {
+        if (!origin || (resolvedConfig.clientOrigins && resolvedConfig.clientOrigins.includes(origin))) {
           return callback(null, true);
         }
 
@@ -35,6 +47,15 @@ function createApp(config) {
       uptime: Math.floor(process.uptime()),
     });
   });
+
+  const authRouter = createAuthRouter({
+    config: resolvedConfig,
+    prisma,
+    authService: dependencies.authService,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/auth", authRouter);
 
   app.use((req, res) => {
     res.status(404).json({

@@ -29,7 +29,7 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 | 0 | Repository and frontend audit | Complete |
 | 1 | Backend V2 foundation and health API | Complete |
 | 2 | TiDB and Prisma connection | Complete |
-| 3 | Authentication and user model | Pending |
+| 3 | Authentication and user model | Complete |
 | 4 | Profile and account APIs | Pending |
 | 5 | User-specific dashboard APIs | Pending |
 | 6 | Projects and file management | Pending |
@@ -47,3 +47,10 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 - Existing frontend features must be preserved.
 - Existing backend files and migrations must remain untouched.
 - Uncommitted repository changes must be preserved.
+
+## Phase 3 Notes
+- Complete JWT authentication system implemented in `server-v2/` with bcryptjs password hashing and Prisma 6.19.3.
+- Endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`.
+- Security: In-memory sliding window rate limiting on auth endpoints, input validation (name, RFC 5322 email, password strength), generic invalid credentials on login failure, sub claim user ID, safe user projections (passwordHash never exposed).
+- Testing: Comprehensive test suite using Node.js built-in test runner with 27 tests passing (including TiDB Cloud integration).
+- Documentation: Detailed API documentation created in `server-v2/docs/AUTH_API.md`.

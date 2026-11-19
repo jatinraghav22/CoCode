@@ -1,9 +1,10 @@
-﻿const { loadEnv } = require("./config/env");
+const { loadEnv } = require("./config/env");
 const { createApp } = require("./app");
+const { prisma } = require("./config/prisma");
 
 function startServer() {
   const config = loadEnv();
-  const app = createApp(config);
+  const app = createApp(config, { prisma });
 
   const server = app.listen(config.port, () => {
     console.log(`CoCode Backend V2 running on port ${config.port}`);
@@ -14,7 +15,13 @@ function startServer() {
   const shutdown = (signal) => {
     console.log(`${signal} received. Shutting down gracefully...`);
 
-    server.close((error) => {
+    server.close(async (error) => {
+      try {
+        await prisma.$disconnect();
+      } catch (prismaErr) {
+        console.error("Prisma disconnect error:", prismaErr.message);
+      }
+
       if (error) {
         console.error("Shutdown error:", error);
         process.exitCode = 1;
