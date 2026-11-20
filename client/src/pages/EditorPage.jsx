@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import JSZip from "jszip";
 import { io } from "socket.io-client";
+import * as Y from "yjs";
+import { MonacoBinding } from "y-monaco";
 import {
   Files,
   Search,
@@ -38,12 +40,12 @@ import {
   FileCode,
   FileText,
   Sliders,
-  Share2
+  Share2,
+  LogOut
 } from "lucide-react";
 import { useAuth } from "../AuthContext.jsx";
+import { API_BASE } from "../config/api.js";
 import "./EditorPage.css";
-
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 // Starter project files matching reference
 const DEFAULT_FILES = [
@@ -91,6 +93,13 @@ export default function EditorPage() {
   const { roomId } = useParams();
   const [searchParams] = useSearchParams();
   const { user, token } = useAuth();
+  const navigate = useNavigate();
+
+  // Connection and Room collaboration state
+  const [connectionStatus, setConnectionStatus] = useState(() => (roomId ? "connecting" : "disconnected"));
+  const [roomError, setRoomError] = useState(null);
+  const [roomCopied, setRoomCopied] = useState(false);
+  const isRemoteUpdateRef = useRef(false);
 
   // Active activity bar tab: files | search | history | run | ai | chat | analytics | teams | settings | devtools
   const [activeActivityTab, setActiveActivityTab] = useState("files");
@@ -194,6 +203,8 @@ export default function EditorPage() {
   const editorRef = useRef(null);
   const socketRef = useRef(null);
   const isResizingRef = useRef(false);
+  const yDocsRef = useRef(new Map());
+  const yBindingRef = useRef(null);
 
   // Get active file object
   const activeFile = useMemo(() => {
@@ -210,48 +221,285 @@ export default function EditorPage() {
   // Initialize Socket.IO connection for real-time room collaboration
   useEffect(() => {
     if (!roomId) return;
+
+    setConnectionStatus("connecting");
+    setRoomError(null);
+
     try {
       const socket = io(API_BASE, {
         auth: { token },
         transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
       });
       socketRef.current = socket;
 
-      socket.emit("join-room", {
-        roomCode: roomId,
-        displayName: user?.name || "Developer",
+      socket.on("connect", () => {
+        setConnectionStatus("connected");
+        setRoomError(null);
+        socket.emit("room:join", {
+          roomCode: roomId,
+          displayName: user?.name || "Developer",
+        });
       });
 
-      socket.on("room-update", (data) => {
-        if (data.members) {
+      socket.on("connect_error", (err) => {
+        setConnectionStatus("error");
+        setRoomError(err.message || "Failed to connect to collaboration server.");
+      });
+
+      socket.on("reconnect_attempt", () => {
+        setConnectionStatus("reconnecting");
+      });
+
+      socket.on("reconnect", () => {
+        setConnectionStatus("connected");
+        setRoomError(null);
+        socket.emit("room:join", {
+          roomCode: roomId,
+          displayName: user?.name || "Developer",
+        });
+      });
+
+      socket.on("disconnect", (reason) => {
+        if (reason === "io client disconnect") {
+          setConnectionStatus("disconnected");
+        } else {
+          setConnectionStatus("reconnecting");
+        }
+      });
+
+      // Synchronize files and presence on joining room
+      socket.on("room:joined", (data) => {
+        setConnectionStatus("connected");
+        setRoomError(null);
+        if (data.state && Array.isArray(data.state.files) && data.state.files.length > 0) {
+          isRemoteUpdateRef.current = true;
+
+          // Re-hydrate local Yjs documents
+          data.state.files.forEach((remoteFile) => {
+            let doc = yDocsRef.current.get(remoteFile.fileId);
+            if (!doc) {
+              doc = new Y.Doc();
+              yDocsRef.current.set(remoteFile.fileId, doc);
+            }
+            if (remoteFile.yjsUpdate && remoteFile.yjsUpdate.length > 0) {
+              try {
+                Y.applyUpdate(doc, new Uint8Array(remoteFile.yjsUpdate), "remote");
+              } catch (e) {
+                console.warn("Error applying remote Yjs state:", e);
+              }
+            } else if (remoteFile.content !== undefined) {
+              const yText = doc.getText("monaco");
+              if (yText.toString() !== remoteFile.content) {
+                doc.transact(() => {
+                  yText.delete(0, yText.length);
+                  yText.insert(0, remoteFile.content);
+                }, "remote");
+              }
+            }
+          });
+
+          // Synchronize files state with persistent documents from server
+          setFiles((prev) => {
+            const fileMap = new Map(prev.map((f) => [f.id, f]));
+            data.state.files.forEach((remoteFile) => {
+              if (fileMap.has(remoteFile.fileId)) {
+                const existing = fileMap.get(remoteFile.fileId);
+                fileMap.set(remoteFile.fileId, {
+                  ...existing,
+                  name: remoteFile.filename || existing.name,
+                  content: remoteFile.content ?? existing.content,
+                  language: remoteFile.language || existing.language,
+                });
+              } else {
+                fileMap.set(remoteFile.fileId, {
+                  id: remoteFile.fileId,
+                  name: remoteFile.filename || remoteFile.fileId,
+                  path: `/${remoteFile.filename || remoteFile.fileId}`,
+                  language: remoteFile.language || "javascript",
+                  content: remoteFile.content || "",
+                  isFolder: false,
+                });
+              }
+            });
+            return Array.from(fileMap.values());
+          });
+
+          setTimeout(() => {
+            isRemoteUpdateRef.current = false;
+          }, 60);
+        }
+
+        if (Array.isArray(data.presence)) {
           setCollaborators(
-            data.members.map((m, idx) => ({
-              id: `collab-${idx}`,
-              name: typeof m === "string" ? m : m.name,
-              role: idx === 0 ? "Host" : "Member",
+            data.presence.map((p, idx) => ({
+              id: p.userId || `collab-${idx}`,
+              name: p.userName || "Developer",
+              role: idx === 0 ? "Host" : "Participant",
               online: true,
             }))
           );
         }
       });
 
-      socket.on("code-change", (data) => {
-        if (data.fileId && data.content !== undefined) {
-          setFiles((prev) =>
-            prev.map((f) => (f.id === data.fileId ? { ...f, content: data.content } : f))
+      // User presence update
+      socket.on("user:presence", (data) => {
+        if (Array.isArray(data.presence)) {
+          setCollaborators(
+            data.presence.map((p, idx) => ({
+              id: p.userId || `collab-${idx}`,
+              name: p.userName || "Developer",
+              role: idx === 0 ? "Host" : "Participant",
+              online: true,
+            }))
           );
         }
       });
 
-      socket.on("chat-message", (msg) => {
-        setChatMessages((prev) => [...prev, msg]);
+      // Legacy presence update
+      socket.on("room-update", (data) => {
+        if (data.members) {
+          setCollaborators(
+            data.members.map((m, idx) => ({
+              id: `collab-${idx}`,
+              name: typeof m === "string" ? m : m.name,
+              role: idx === 0 ? "Host" : "Participant",
+              online: true,
+            }))
+          );
+        }
       });
 
+      // User joined / left notifications
+      socket.on("user:joined", (data) => {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: `sys-${Date.now()}`,
+            senderId: "system",
+            senderName: "System",
+            text: `${data.userName || "A collaborator"} joined the session.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ]);
+      });
+
+      socket.on("user:left", (data) => {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: `sys-${Date.now()}`,
+            senderId: "system",
+            senderName: "System",
+            text: `${data.userName || "A collaborator"} disconnected.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ]);
+      });
+
+      // Room errors
+      socket.on("room:error", (errData) => {
+        setRoomError(errData?.message || "Room error occurred.");
+      });
+
+      // Incremental Yjs CRDT update from peer
+      socket.on("yjs:update", (data) => {
+        if (!data || !data.fileId || !data.update) return;
+
+        let doc = yDocsRef.current.get(data.fileId);
+        if (!doc) {
+          doc = new Y.Doc();
+          yDocsRef.current.set(data.fileId, doc);
+        }
+
+        try {
+          Y.applyUpdate(doc, new Uint8Array(data.update), "remote");
+          const updatedContent = doc.getText("monaco").toString();
+
+          isRemoteUpdateRef.current = true;
+          setFiles((prev) =>
+            prev.map((f) => (f.id === data.fileId ? { ...f, content: updatedContent } : f))
+          );
+          setTimeout(() => {
+            isRemoteUpdateRef.current = false;
+          }, 30);
+        } catch (err) {
+          console.warn("Failed to apply remote Yjs update:", err);
+        }
+      });
+
+      // Canonical and legacy full text updates
+      const handleRemoteCodeChange = (data) => {
+        if (!data || !data.fileId || data.content === undefined) return;
+        let doc = yDocsRef.current.get(data.fileId);
+        if (doc) {
+          const yText = doc.getText("monaco");
+          // If already matches content (e.g. applied via authoritative Yjs), skip duplicate apply
+          if (yText.toString() === data.content) {
+            return;
+          }
+          doc.transact(() => {
+            yText.delete(0, yText.length);
+            yText.insert(0, data.content);
+          }, "remote");
+        }
+
+        isRemoteUpdateRef.current = true;
+        setFiles((prev) =>
+          prev.map((f) => (f.id === data.fileId ? { ...f, content: data.content } : f))
+        );
+        setTimeout(() => {
+          isRemoteUpdateRef.current = false;
+        }, 60);
+      };
+
+      socket.on("code:update", handleRemoteCodeChange);
+      socket.on("code-change", handleRemoteCodeChange);
+
+      // Handle incoming chat messages with strict ID deduplication and optimistic reconciliation
+      const handleIncomingChatMessage = (msg) => {
+        if (!msg || !msg.id) return;
+        setChatMessages((prev) => {
+          // 1. If message already exists by ID, update/reconcile in place
+          const existingIdx = prev.findIndex((m) => m.id === msg.id);
+          if (existingIdx !== -1) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...updated[existingIdx], ...msg, optimistic: false };
+            return updated;
+          }
+          // 2. If an optimistic message from current user with matching text exists, reconcile it
+          const optIdx = prev.findIndex(
+            (m) =>
+              m.optimistic &&
+              (m.senderId === msg.senderId || m.senderId === (user?.id || "u-current")) &&
+              m.text === msg.text
+          );
+          if (optIdx !== -1) {
+            const updated = [...prev];
+            updated[optIdx] = { ...msg, optimistic: false };
+            return updated;
+          }
+          // 3. Otherwise append as new message
+          return [...prev, msg];
+        });
+      };
+
+      socket.on("chat:message", handleIncomingChatMessage);
+      socket.on("chat-message", handleIncomingChatMessage);
+
       return () => {
+        socket.off("code:update", handleRemoteCodeChange);
+        socket.off("code-change", handleRemoteCodeChange);
+        socket.off("chat:message", handleIncomingChatMessage);
+        socket.off("chat-message", handleIncomingChatMessage);
         socket.disconnect();
       };
     } catch (err) {
       console.warn("Socket.IO connection failed:", err);
+      setConnectionStatus("error");
+      setRoomError("Could not initialize real-time connection.");
     }
   }, [roomId, token, user]);
 
@@ -286,24 +534,136 @@ export default function EditorPage() {
     editorRef.current = editor;
   }
 
+  // Set up Yjs CRDT Monaco Binding for the active file
+  useEffect(() => {
+    if (!roomId || !editorRef.current || !activeFile) return;
+
+    let doc = yDocsRef.current.get(activeFile.id);
+    if (!doc) {
+      doc = new Y.Doc();
+      const yText = doc.getText("monaco");
+      if (activeFile.content) {
+        yText.insert(0, activeFile.content);
+      }
+      yDocsRef.current.set(activeFile.id, doc);
+    }
+
+    const yText = doc.getText("monaco");
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    if (yText.length === 0 && activeFile.content) {
+      yText.insert(0, activeFile.content);
+    }
+
+    // Clean up previous binding
+    if (yBindingRef.current) {
+      try {
+        yBindingRef.current.destroy();
+      } catch {}
+      yBindingRef.current = null;
+    }
+
+    // Ensure model matches yText on file switch
+    const currentText = yText.toString();
+    if (model.getValue() !== currentText) {
+      model.setValue(currentText);
+    }
+
+    // Listen for local updates from Monaco edits and emit incremental binary update to room
+    const handleLocalUpdate = (update, origin) => {
+      if (origin !== "remote" && socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("yjs:update", {
+          roomCode: roomId,
+          fileId: activeFile.id,
+          update: Array.from(update),
+        });
+      }
+    };
+
+    doc.on("update", handleLocalUpdate);
+
+    let binding = null;
+    try {
+      binding = new MonacoBinding(
+        yText,
+        model,
+        new Set([editorRef.current])
+      );
+      yBindingRef.current = binding;
+    } catch (err) {
+      console.warn("MonacoBinding initialization:", err);
+    }
+
+    return () => {
+      doc.off("update", handleLocalUpdate);
+      if (binding) {
+        try {
+          binding.destroy();
+        } catch {}
+      }
+      yBindingRef.current = null;
+    };
+  }, [roomId, activeFile?.id]);
+
   // Handle Code Change
   function handleCodeChange(newContent) {
     if (!activeFile) return;
     const content = newContent || "";
 
+    // In local standalone mode (!roomId), update state directly
+    if (!roomId) {
+      setFiles((prev) =>
+        prev.map((f) => (f.id === activeFile.id ? { ...f, content } : f))
+      );
+      setDirtyFiles((prev) => ({ ...prev, [activeFile.id]: true }));
+      return;
+    }
+
+    // In room mode, Yjs is authoritative. Update dirty state and files cache for run/download
+    // without triggering controlled Monaco resets.
+    setDirtyFiles((prev) => ({ ...prev, [activeFile.id]: true }));
     setFiles((prev) =>
       prev.map((f) => (f.id === activeFile.id ? { ...f, content } : f))
     );
 
-    setDirtyFiles((prev) => ({ ...prev, [activeFile.id]: true }));
-
-    // Real-time broadcast if in room
-    if (socketRef.current && roomId) {
-      socketRef.current.emit("code-change", {
+    // Fallback broadcast if in room AND this change was made without active Yjs binding
+    if (socketRef.current && !isRemoteUpdateRef.current && !yBindingRef.current) {
+      socketRef.current.emit("code:update", {
         roomCode: roomId,
         fileId: activeFile.id,
         content,
+        language: activeFile.language || "javascript",
       });
+    }
+  }
+
+  // Leave room action
+  function handleLeaveRoom() {
+    if (yBindingRef.current) {
+      try {
+        yBindingRef.current.destroy();
+      } catch {}
+      yBindingRef.current = null;
+    }
+    yDocsRef.current.clear();
+
+    if (socketRef.current) {
+      socketRef.current.emit("room:leave");
+      socketRef.current.disconnect();
+    }
+    navigate("/rooms/join");
+  }
+
+  // Copy room code to clipboard
+  async function copyRoomCode() {
+    if (!roomId) return;
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setRoomCopied(true);
+      setTimeout(() => setRoomCopied(false), 2000);
+    } catch {
+      alert(`Room code: ${roomId}`);
     }
   }
 
@@ -588,12 +948,14 @@ export default function EditorPage() {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newMsg = {
-      id: `msg-${Date.now()}`,
+      id: messageId,
       senderId: user?.id || "u-current",
       senderName: user?.name || "Developer",
       text: chatInput.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      optimistic: true,
     };
 
     setChatMessages((prev) => [...prev, newMsg]);
@@ -602,6 +964,8 @@ export default function EditorPage() {
     if (socketRef.current && roomId) {
       socketRef.current.emit("chat-message", {
         roomCode: roomId,
+        id: messageId,
+        text: newMsg.text,
         message: newMsg,
       });
     }
@@ -659,11 +1023,67 @@ export default function EditorPage() {
           <div className="ide-project-title-badge">
             <span>Project:</span>
             <strong>{roomId ? `Room ${roomId}` : "Default Workspace"}</strong>
+            {roomId && (
+              <button
+                className="ide-icon-btn"
+                style={{ padding: "2px 4px", marginLeft: 4 }}
+                onClick={copyRoomCode}
+                title="Copy Room Code"
+              >
+                {roomCopied ? <CheckCircle2 size={11} color="#10b981" /> : <Copy size={11} />}
+              </button>
+            )}
           </div>
           {roomId && (
-            <div className="ide-collab-badge">
-              <span className="ide-collab-dot" />
-              <span>{collaborators.length} Online</span>
+            <div
+              className="ide-collab-badge"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "2px 8px",
+                borderRadius: 4,
+                fontSize: 11,
+                background:
+                  connectionStatus === "connected"
+                    ? "rgba(16, 185, 129, 0.12)"
+                    : connectionStatus === "connecting" || connectionStatus === "reconnecting"
+                    ? "rgba(245, 158, 11, 0.12)"
+                    : "rgba(239, 68, 68, 0.12)",
+                color:
+                  connectionStatus === "connected"
+                    ? "#34d399"
+                    : connectionStatus === "connecting" || connectionStatus === "reconnecting"
+                    ? "#fbbf24"
+                    : "#f87171",
+              }}
+              title={`Connection status: ${connectionStatus}`}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  backgroundColor:
+                    connectionStatus === "connected"
+                      ? "#10b981"
+                      : connectionStatus === "connecting" || connectionStatus === "reconnecting"
+                      ? "#f59e0b"
+                      : "#ef4444",
+                }}
+              />
+              <span>
+                {connectionStatus === "connected"
+                  ? `${collaborators.length} Online`
+                  : connectionStatus === "connecting"
+                  ? "Connecting..."
+                  : connectionStatus === "reconnecting"
+                  ? "Reconnecting..."
+                  : connectionStatus === "error"
+                  ? "Offline"
+                  : "Disconnected"}
+              </span>
             </div>
           )}
         </div>
@@ -702,8 +1122,46 @@ export default function EditorPage() {
             <Share2 size={13} />
             <span>Share</span>
           </button>
+
+          {roomId && (
+            <button
+              className="ide-btn-header-secondary"
+              onClick={handleLeaveRoom}
+              title="Leave Room"
+              style={{ color: "#f87171" }}
+            >
+              <LogOut size={13} />
+              <span>Leave</span>
+            </button>
+          )}
         </div>
       </header>
+
+      {roomError && (
+        <div
+          style={{
+            padding: "6px 14px",
+            background: "rgba(239, 68, 68, 0.15)",
+            borderBottom: "1px solid rgba(239, 68, 68, 0.3)",
+            color: "#fca5a5",
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertCircle size={14} color="#ef4444" />
+            <span>{roomError}</span>
+          </div>
+          <button
+            style={{ background: "none", border: "none", color: "#fca5a5", cursor: "pointer" }}
+            onClick={() => setRoomError(null)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ======================================================================
           Main Body (Activity Bar + Sidebar + Main Surface)
@@ -1211,18 +1669,20 @@ export default function EditorPage() {
                 <div style={{ marginBottom: 12, background: "#111827", padding: 10, borderRadius: 6 }}>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>ROOM CODE</div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <strong style={{ fontSize: 15, color: "#38bdf8" }}>{roomId || "DEMO01"}</strong>
+                    <strong style={{ fontSize: 15, color: "#38bdf8", letterSpacing: "1px" }}>{roomId || "SOLO"}</strong>
                     <button
                       className="ide-icon-btn"
-                      onClick={() => {
-                        navigator.clipboard.writeText(roomId || "DEMO01");
-                        alert("Room code copied to clipboard!");
-                      }}
+                      onClick={copyRoomCode}
                       title="Copy code"
                     >
-                      <Copy size={13} />
+                      {roomCopied ? <CheckCircle2 size={13} color="#10b981" /> : <Copy size={13} />}
                     </button>
                   </div>
+                  {roomCopied && (
+                    <div style={{ fontSize: 11, color: "#34d399", marginTop: 4 }}>
+                      ✓ Code copied to clipboard!
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1397,9 +1857,12 @@ export default function EditorPage() {
           <div className="ide-editor-workspace">
             {activeFile ? (
               <Editor
+                key={roomId ? activeFile.id : "standalone"}
+                path={activeFile.path || activeFile.id}
                 height="100%"
                 language={activeFile.language || "javascript"}
-                value={activeFile.content || ""}
+                value={roomId ? undefined : (activeFile.content || "")}
+                defaultValue={activeFile.content || ""}
                 theme="cocode-dark"
                 beforeMount={handleEditorWillMount}
                 onMount={handleEditorDidMount}

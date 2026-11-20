@@ -21,9 +21,8 @@ import {
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { useAuth } from "../AuthContext.jsx";
+import { API_BASE } from "../config/api.js";
 import "./Dashboard.css";
-
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function Dashboard() {
   const { user, token } = useAuth();

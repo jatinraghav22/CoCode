@@ -15,5 +15,75 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Phase 6: Real-Time Collaboration relations
+  ownedRooms   CollaborationRoom[]  @relation("RoomOwner")
+  roomMemberships RoomParticipant[] @relation("ParticipantUser")
+
   @@map("users")
+}
+
+// Phase 6: Collaboration room — persistent room record.
+// A room is never deleted automatically; only the owner can close it.
+model CollaborationRoom {
+  id        String   @id @default(cuid())
+  code      String   @unique // 6-char uppercase alphanumeric invite code
+  name      String
+  isPrivate Boolean  @default(true)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The user who created this room
+  ownerId   String
+  owner     User   @relation("RoomOwner", fields: [ownerId], references: [id])
+
+  // All participants who have ever joined (or are currently in) this room
+  participants RoomParticipant[] @relation("RoomParticipants")
+
+  // Phase 6 Production: Persistent room code documents
+  documents    RoomDocument[]    @relation("RoomDocuments")
+
+  @@index([code])
+  @@index([ownerId])
+  @@map("collaboration_rooms")
+}
+
+// Phase 6: Room participant record — tracks membership per room.
+// A participant record is created when a user first joins a room.
+// isActive reflects whether the user is currently connected.
+model RoomParticipant {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room      CollaborationRoom @relation("RoomParticipants", fields: [roomId], references: [id])
+  user      User              @relation("ParticipantUser",  fields: [userId],  references: [id])
+
+  // A user can only have one participant record per room
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+  @@map("room_participants")
+}
+
+// Phase 6: Persistent collaboration documents — keeps file content in TiDB Cloud
+// so that documents survive backend restarts and multi-instance restarts.
+model RoomDocument {
+  id        String   @id @default(cuid())
+  roomId    String
+  fileId    String   // Canonical file identifier e.g. "f-1"
+  filename  String   // File display name or relative path e.g. "index.js"
+  language  String   @default("javascript")
+  content   String   @db.LongText
+  yjsState  Bytes?   @db.LongBlob
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room      CollaborationRoom @relation("RoomDocuments", fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, fileId])
+  @@index([roomId])
+  @@map("room_documents")
 }

@@ -5,6 +5,8 @@ const { prisma: defaultPrisma } = require("./config/prisma");
 const { createAuthRouter } = require("./routes/auth.routes");
 const { createUserRouter } = require("./routes/user.routes");
 const { createCompilerRouter } = require("./routes/compiler.routes");
+const { createRoomRouter } = require("./routes/room.routes");
+const { createDashboardRouter } = require("./routes/dashboard.routes");
 
 function createApp(config, dependencies = {}) {
   const app = express();
@@ -77,6 +79,24 @@ function createApp(config, dependencies = {}) {
   });
 
   app.use("/api/compiler", compilerRouter);
+
+  const roomRouter = createRoomRouter({
+    config: resolvedConfig,
+    prisma,
+    roomService: dependencies.roomService,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/rooms", roomRouter);
+
+  const dashboardRouter = createDashboardRouter({
+    config: resolvedConfig,
+    prisma,
+    dashboardService: dependencies.dashboardService,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/dashboard", dashboardRouter);
 
   app.use((req, res) => {
     res.status(404).json({

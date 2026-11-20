@@ -32,11 +32,11 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 | 3 | Authentication and user model | Complete |
 | 4 | Profile and account APIs | Complete |
 | 5 | Coding Workspace & Compiler | Complete |
-| 6 | Projects and file management | Pending |
+| 6 | Real-Time Collaboration (Rooms & Sockets) | Complete |
 | 7 | User-specific dashboard APIs | Pending |
-| 8 | Socket.IO collaboration | Pending |
-| 9 | Security and validation | Pending |
-| 10 | Frontend integration | Pending |
+| 8 | Advanced Collaboration Enhancements | Pending |
+| 9 | Security and validation hardening | Pending |
+| 10 | Frontend deployment integration | Pending |
 | 11 | Testing and bug fixing | Pending |
 | 12 | Deployment | Pending |
 | 13 | Production verification | Pending |
@@ -71,3 +71,34 @@ CoCode - Cloud-Based Unified Real-Time Collaborative Code Editor
 - Compatibility: Responses return both the normalized Backend V2 envelope (`data: { status, stdout, stderr, compileOutput, time, memory, language }`) and top-level fields for zero-modification compatibility with the existing React frontend `Compiler.jsx`.
 - Testing: Comprehensive test suite with 80 total tests across Backend V2 (77 passing, 3 network-dependent tests safely skipped when offline). Added 21 compiler unit tests (`tests/compiler.test.js`), 12 compiler integration tests (`tests/compiler.integration.test.js`), and 1 live smoke test (`tests/compiler.external.test.js`).
 - Documentation: Detailed API documentation created in `server-v2/docs/COMPILER_API.md`.
+
+## Phase 6 Notes
+- Complete Production-Grade Real-Time Collaboration implemented in `server-v2/` with Socket.IO, Yjs CRDT synchronization, and Prisma TiDB Cloud models.
+- Database:
+  - `CollaborationRoom`: Indexed 6-character room codes, owner foreign keys, isPrivate flag.
+  - `RoomParticipant`: Unique `[roomId, userId]` participant constraints, safe idempotent joins.
+  - `RoomDocument`: Persistent file storage in TiDB Cloud (`@db.LongText`), unique `[roomId, fileId]`, tracks language, filename, and auto-saves code. Schema pushed to TiDB Cloud.
+- REST Endpoints:
+  - `POST /api/rooms` (authenticated room creation with automatic initialization of persistent default documents).
+  - `POST /api/rooms/join` (race-safe, idempotent room enrollment using Prisma upsert & P2002 collision catch).
+  - `GET /api/rooms/:code` (participant metadata access validation).
+  - `GET /api/rooms/:code/documents` (retrieval of all persistent room documents for enrolled participants).
+- Real-Time Gateway (`src/socket.js`) & Yjs Synchronization (`src/modules/rooms/room.store.js`):
+  - Handshake JWT authentication verifying signature, expiration, issuer, and audience; rejects unauthenticated sockets.
+  - Persistent room authorization verifying user is an enrolled participant in TiDB before joining Socket.IO rooms.
+  - Yjs CRDT incremental synchronization via `yjs:update`: binary updates broadcast with echo prevention; prevents full-file overwrite conflicts and guarantees convergence across simultaneous edits.
+  - Legacy `code:update` retained for backward compatibility.
+  - Persistent backing: `RoomStateStore` re-hydrates `Y.Doc` state directly from TiDB `room_documents`, debounces saves (1000ms), and flushes to database on server shutdown. Full recovery after backend restart.
+  - Multi-tab presence management: `user:joined`, `user:left`, and `user:presence` with multi-socket tracking per user.
+  - Safe in-memory chat messaging (`chat:message`) with timestamp and sanitized user identity.
+  - Rate limiting on room creation (10/15 min) and joining (30/15 min); 200 KB code payload bounds.
+- Frontend Integration (`EditorPage.jsx` & `vite.config.js`):
+  - Installed `yjs`, `y-monaco`, `y-protocols`.
+  - Configured Vite alias for `monaco-editor` module path to resolve bundling.
+  - Real-time `MonacoBinding` binding Monaco editor models to Yjs text types with conflict-free collaborative editing.
+  - Real-time socket handlers for `yjs:update` and `room:joined` initial state rehydration.
+  - Connection status badge (connecting, connected, reconnecting, disconnected, error).
+  - Copy room ID button with visual feedback in toolbar and teams panel.
+  - Graceful "Leave Room" navigation and disconnect action.
+- Testing: Comprehensive test suite with 103 total tests across Backend V2 (100 passing, 3 network-dependent tests safely skipped when offline). Added 13 room management tests (`tests/room.test.js`) and 10 socket collaboration & Yjs tests (`tests/socket.test.js`).
+- Documentation: Detailed architecture and API documentation created in `server-v2/docs/COLLABORATION_API.md`.

@@ -33,9 +33,8 @@ import {
   Clock,
 } from "lucide-react";
 import { useAuth } from "../AuthContext.jsx";
+import { API_BASE } from "../config/api.js";
 import "./Compiler.css";
-
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 const STORAGE_KEY_FILES = "cocode_compiler_workspace_files_v1";
 const STORAGE_KEY_SETTINGS = "cocode_compiler_settings_v1";
 const STORAGE_KEY_HISTORY = "cocode_compiler_code_revisions_v1";
