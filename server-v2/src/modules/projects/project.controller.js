@@ -173,6 +173,111 @@ class ProjectController {
       return next(error);
     }
   };
+
+  createFolder = async (req, res, next) => {
+    try {
+      const userId = req.userId;
+      const { id } = req.params;
+      const result = await this.projectService.createFolder(userId, id, req.body);
+      return res.status(201).json(result);
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          message: error.message,
+        });
+      }
+      return next(error);
+    }
+  };
+
+  renameFolder = async (req, res, next) => {
+    try {
+      const userId = req.userId;
+      const { id } = req.params;
+      const result = await this.projectService.renameFolder(userId, id, req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          message: error.message,
+        });
+      }
+      return next(error);
+    }
+  };
+
+  deleteFolder = async (req, res, next) => {
+    try {
+      const userId = req.userId;
+      const { id } = req.params;
+      const folderPath = req.query.path || req.body?.path;
+      if (!folderPath) {
+        return res.status(400).json({
+          success: false,
+          error: "Folder path is required.",
+          message: "Folder path is required.",
+        });
+      }
+      const result = await this.projectService.deleteFolder(userId, id, folderPath);
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          message: error.message,
+        });
+      }
+      return next(error);
+    }
+  };
+
+  searchProject = async (req, res, next) => {
+    try {
+      const userId = req.userId;
+      const { id } = req.params;
+      const query = req.query.q || req.query.query || "";
+      const matchCase = req.query.matchCase === "true" || req.query.matchCase === "1";
+      const wholeWord = req.query.wholeWord === "true" || req.query.wholeWord === "1";
+      const result = await this.projectService.searchProjectFiles(userId, id, query, {
+        matchCase,
+        wholeWord,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          message: error.message,
+        });
+      }
+      return next(error);
+    }
+  };
+
+  saveAllFiles = async (req, res, next) => {
+    try {
+      const userId = req.userId;
+      const { id } = req.params;
+      const files = req.body?.files || [];
+      const result = await this.projectService.saveAllFiles(userId, id, files);
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          message: error.message,
+        });
+      }
+      return next(error);
+    }
+  };
 }
 
 module.exports = { ProjectController };

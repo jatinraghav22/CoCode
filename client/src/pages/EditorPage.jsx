@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import JSZip from "jszip";
@@ -11,7 +11,6 @@ import {
   History,
   Play,
   Square,
-  Sparkles,
   MessageSquare,
   TrendingUp,
   Users,
@@ -25,8 +24,6 @@ import {
   Download,
   X,
   Plus,
-  ChevronRight,
-  ChevronDown,
   Trash2,
   Edit2,
   Copy,
@@ -34,17 +31,27 @@ import {
   Send,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
   RefreshCw,
   Folder,
   FileCode,
   FileText,
   Sliders,
   Share2,
-  LogOut
+  LogOut,
+  AlertTriangle,
+  RotateCcw,
+  Check,
+  Save,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../AuthContext.jsx";
 import { API_BASE } from "../config/api.js";
+import FileTree from "../components/ide/FileTree.jsx";
+import FindReplaceWidget from "../components/ide/FindReplaceWidget.jsx";
+import CommandPalette from "../components/ide/CommandPalette.jsx";
+import QuickOpen from "../components/ide/QuickOpen.jsx";
+import TerminalConsole from "../components/ide/TerminalConsole.jsx";
+import ConfirmModal from "../components/ide/ConfirmModal.jsx";
 import "./EditorPage.css";
 
 // Starter project files matching reference
@@ -86,7 +93,7 @@ const DEFAULT_FILES = [
     language: "javascript",
     content: `console.log("CoCode modular app initialized.");\n`,
     isFolder: false,
-  }
+  },
 ];
 
 export default function EditorPage() {
@@ -101,17 +108,17 @@ export default function EditorPage() {
   const [projectLoading, setProjectLoading] = useState(() => Boolean(projectId));
   const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "unsaved" | "error"
 
-  // Connection and Room collaboration state
+  // Connection and Room collaboration state (Phase 6)
   const [connectionStatus, setConnectionStatus] = useState(() => (roomId ? "connecting" : "disconnected"));
   const [roomError, setRoomError] = useState(null);
   const [roomCopied, setRoomCopied] = useState(false);
   const isRemoteUpdateRef = useRef(false);
 
-  // Active activity bar tab: files | search | history | run | ai | chat | analytics | teams | settings | devtools
+  // Active activity bar tab: files | search | history | run | chat | analytics | teams | settings | devtools
   const [activeActivityTab, setActiveActivityTab] = useState("files");
 
   // Files & Folders state
-  const projectStorageKey = useMemo(() => `cocode-ide-files-${roomId || "default"}`, [roomId]);
+  const projectStorageKey = useMemo(() => `cocode-ide-files-${roomId || projectId || "default"}`, [roomId, projectId]);
   const [files, setFiles] = useState(() => {
     try {
       const saved = localStorage.getItem(projectStorageKey);
@@ -120,42 +127,72 @@ export default function EditorPage() {
     return DEFAULT_FILES;
   });
 
-  // Open Editor tabs
+  // Open Editor tabs (Phase 8.3)
   const [openTabIds, setOpenTabIds] = useState(["f-1"]);
   const [activeFileId, setActiveFileId] = useState("f-1");
   const [dirtyFiles, setDirtyFiles] = useState({}); // { [fileId]: true }
 
-  // Folder collapse state
+  // Folder collapse state (Phase 8.2)
   const [expandedFolders, setExpandedFolders] = useState({ "/src": true });
 
-  // Inline rename / new file creation state
-  const [renamingId, setRenamingId] = useState(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [newFileInput, setNewFileInput] = useState(null); // { parentPath: string, isFolder: boolean }
-  const [newItemName, setNewItemName] = useState("");
-
-  // Editor Settings state
-  const [editorSettings, setEditorSettings] = useState({
-    theme: "cocode-dark",
-    fontSize: 14,
-    tabSize: 4,
-    wordWrap: "on",
-    minimap: true,
-    lineNumbers: "on",
-    autoSave: true,
+  // Dialog and Modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Delete",
+    confirmVariant: "danger",
+    onConfirm: null,
   });
 
-  // Bottom Panel State (Output, Terminal, Stdin, Problems, History)
-  const [bottomPanelTab, setBottomPanelTab] = useState("output");
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  // Find & Replace Overlay Widget state (Phase 8.4)
+  const [isFindOpen, setIsFindOpen] = useState(false);
+
+  // Command Palette & Quick Open state (Phase 8.7)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false);
+
+  // Toast / Status Message
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Editor Settings state (persisted per user)
+  const settingsStorageKey = useMemo(() => `cocode_editor_settings_${user?.id || "guest"}`, [user?.id]);
+  const [editorSettings, setEditorSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(settingsStorageKey);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      theme: "cocode-dark",
+      fontSize: 14,
+      tabSize: 4,
+      wordWrap: "on",
+      minimap: true,
+      lineNumbers: "on",
+      autoSave: true,
+      autoSaveDelay: 1500,
+      formatOnSave: false,
+    };
+  });
+
+  // Save settings to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(settingsStorageKey, JSON.stringify(editorSettings));
+    } catch {}
+  }, [editorSettings, settingsStorageKey]);
+
+  // Bottom Panel State (terminal, output, stdin, problems, history)
+  const [bottomPanelTab, setBottomPanelTab] = useState("terminal");
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(220);
   const [isBottomPanelCollapsed, setIsBottomPanelCollapsed] = useState(false);
   const [stdinValue, setStdinValue] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionOutput, setExecutionOutput] = useState({
-    stdout: 'Hello world\n',
-    stderr: '',
-    compileOutput: '',
-    status: 'Finished',
+    stdout: "Hello world\n",
+    stderr: "",
+    compileOutput: "",
+    status: "Finished",
     time: 0.024,
     memory: 14200,
   });
@@ -167,7 +204,7 @@ export default function EditorPage() {
       status: "Success",
       time: "0.024s",
       output: "Hello world",
-    }
+    },
   ]);
 
   // Version History state
@@ -179,19 +216,17 @@ export default function EditorPage() {
       timestamp: Date.now() - 3600000,
       content: DEFAULT_FILES[0].content,
       author: user?.name || "Developer",
-    }
+    },
   ]);
 
-  // Global Search state
+  // Global Project Search state (Phase 8.4)
   const [searchQuery, setSearchQuery] = useState("");
   const [matchCase, setMatchCase] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // AI Assistant state
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-
-  // Chat & Real-Time Collaboration state
+  // Chat & Real-Time Collaboration state (Phase 6)
   const [chatMessages, setChatMessages] = useState([
     {
       id: "msg-1",
@@ -199,23 +234,71 @@ export default function EditorPage() {
       senderName: "CoCode Bot",
       text: `Connected to IDE session ${roomId ? `[Room: ${roomId}]` : "(Local Project)"}.`,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    }
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [collaborators, setCollaborators] = useState([
-    { id: user?.id || "u-current", name: user?.name || "Developer", role: "Host", online: true }
+    { id: user?.id || "u-current", name: user?.name || "Developer", role: "Host", online: true },
   ]);
 
   const editorRef = useRef(null);
+  const monacoRef = useRef(null);
   const socketRef = useRef(null);
   const isResizingRef = useRef(false);
   const yDocsRef = useRef(new Map());
   const yBindingRef = useRef(null);
 
-  // Get active file object
+  // Phase 8.9: Per-file save tracking, view state caching, and autosave timers
+  const fileVersionRef = useRef(new Map()); // fileId -> integer revision
+  const fileContentRef = useRef(new Map()); // fileId -> latest string content
+  const fileSavedVersionRef = useRef(new Map()); // fileId -> last successfully saved revision
+  const fileSavingInFlightRef = useRef(new Map()); // fileId -> boolean
+  const fileNeedsReSaveRef = useRef(new Map()); // fileId -> boolean
+  const autoSaveTimersRef = useRef(new Map()); // fileId -> timerId
+  const viewStatesRef = useRef(new Map()); // fileId -> ICodeEditorViewState
+  const activeFileIdRef = useRef(activeFileId);
+
+  // Active file resolution
   const activeFile = useMemo(() => {
-    return files.find((f) => f.id === activeFileId) || files.find((f) => !f.isFolder) || null;
+    return (
+      files.find((f) => f.id === activeFileId && !f.isFolder) ||
+      files.find((f) => !f.isFolder && f.name !== ".cocode-keep") ||
+      null
+    );
   }, [files, activeFileId]);
+
+  // Clean up all autosave timers when component unmounts
+  useEffect(() => {
+    return () => {
+      autoSaveTimersRef.current.forEach((timer) => clearTimeout(timer));
+      autoSaveTimersRef.current.clear();
+    };
+  }, []);
+
+  // Helper to read the freshest content for any file (preferring live Monaco model)
+  const getLatestFileContent = useCallback((fileId) => {
+    if (activeFileId === fileId && editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (model) {
+        const val = model.getValue();
+        fileContentRef.current.set(fileId, val);
+        return val;
+      }
+    }
+    if (fileContentRef.current.has(fileId)) {
+      return fileContentRef.current.get(fileId);
+    }
+    const f = files.find((item) => item.id === fileId);
+    return f ? f.content || "" : "";
+  }, [activeFileId, files]);
+
+  // Toast notification helper
+  const showToast = useCallback((msg, duration = 2500) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((cur) => (cur === msg ? null : cur));
+    }, duration);
+  }, []);
 
   // Save files to localStorage
   useEffect(() => {
@@ -225,56 +308,51 @@ export default function EditorPage() {
   }, [files, projectStorageKey]);
 
   // Load persistent project from database when projectId is in URL
-  useEffect(() => {
+  const fetchProjectData = useCallback(async () => {
     if (!projectId || !token) return;
 
-    let active = true;
     setProjectLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    async function loadProject() {
-      try {
-        const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error(`Failed to load project (${res.status})`);
-        }
-
-        const data = await res.json();
-        if (active && data.project) {
-          setProjectData(data.project);
-          if (data.project.files && data.project.files.length > 0) {
-            const serverFiles = data.project.files.map((f) => ({
-              id: f.id,
-              name: f.name,
-              path: f.path,
-              language: f.language,
-              content: f.content || "",
-              isFolder: false,
-            }));
-            setFiles(serverFiles);
-            setOpenTabIds([serverFiles[0].id]);
-            setActiveFileId(serverFiles[0].id);
-          }
-        }
-      } catch (err) {
-        console.error("Project load error:", err);
-      } finally {
-        if (active) setProjectLoading(false);
+      if (!res.ok) {
+        throw new Error(`Failed to load project (${res.status})`);
       }
+
+      const data = await res.json();
+      if (data.project) {
+        setProjectData(data.project);
+        if (data.project.files && data.project.files.length > 0) {
+          const serverFiles = data.project.files.map((f) => ({
+            id: f.id,
+            name: f.name,
+            path: f.path,
+            language: f.language,
+            content: f.content || "",
+            isFolder: false,
+          }));
+          setFiles(serverFiles);
+          const firstNonKeep = serverFiles.find((f) => f.name !== ".cocode-keep") || serverFiles[0];
+          setOpenTabIds([firstNonKeep.id]);
+          setActiveFileId(firstNonKeep.id);
+        }
+      }
+    } catch (err) {
+      console.error("Project load error:", err);
+    } finally {
+      setProjectLoading(false);
     }
-
-    loadProject();
-
-    return () => {
-      active = false;
-    };
   }, [projectId, token]);
 
-  // Initialize Socket.IO connection for real-time room collaboration
+  useEffect(() => {
+    fetchProjectData();
+  }, [fetchProjectData]);
+
+  // Initialize Socket.IO connection for real-time room collaboration (Phase 6)
   useEffect(() => {
     if (!roomId) return;
 
@@ -414,20 +492,6 @@ export default function EditorPage() {
         }
       });
 
-      // Legacy presence update
-      socket.on("room-update", (data) => {
-        if (data.members) {
-          setCollaborators(
-            data.members.map((m, idx) => ({
-              id: `collab-${idx}`,
-              name: typeof m === "string" ? m : m.name,
-              role: idx === 0 ? "Host" : "Participant",
-              online: true,
-            }))
-          );
-        }
-      });
-
       // User joined / left notifications
       socket.on("user:joined", (data) => {
         setChatMessages((prev) => [
@@ -455,7 +519,6 @@ export default function EditorPage() {
         ]);
       });
 
-      // Room errors
       socket.on("room:error", (errData) => {
         setRoomError(errData?.message || "Room error occurred.");
       });
@@ -492,10 +555,7 @@ export default function EditorPage() {
         let doc = yDocsRef.current.get(data.fileId);
         if (doc) {
           const yText = doc.getText("monaco");
-          // If already matches content (e.g. applied via authoritative Yjs), skip duplicate apply
-          if (yText.toString() === data.content) {
-            return;
-          }
+          if (yText.toString() === data.content) return;
           doc.transact(() => {
             yText.delete(0, yText.length);
             yText.insert(0, data.content);
@@ -514,18 +574,16 @@ export default function EditorPage() {
       socket.on("code:update", handleRemoteCodeChange);
       socket.on("code-change", handleRemoteCodeChange);
 
-      // Handle incoming chat messages with strict ID deduplication and optimistic reconciliation
+      // Handle chat messages
       const handleIncomingChatMessage = (msg) => {
         if (!msg || !msg.id) return;
         setChatMessages((prev) => {
-          // 1. If message already exists by ID, update/reconcile in place
           const existingIdx = prev.findIndex((m) => m.id === msg.id);
           if (existingIdx !== -1) {
             const updated = [...prev];
             updated[existingIdx] = { ...updated[existingIdx], ...msg, optimistic: false };
             return updated;
           }
-          // 2. If an optimistic message from current user with matching text exists, reconcile it
           const optIdx = prev.findIndex(
             (m) =>
               m.optimistic &&
@@ -537,7 +595,6 @@ export default function EditorPage() {
             updated[optIdx] = { ...msg, optimistic: false };
             return updated;
           }
-          // 3. Otherwise append as new message
           return [...prev, msg];
         });
       };
@@ -559,8 +616,9 @@ export default function EditorPage() {
     }
   }, [roomId, token, user]);
 
-  // Setup custom dark Monaco theme
+  // Setup Monaco Dark Theme
   function handleEditorWillMount(monaco) {
+    monacoRef.current = monaco;
     monaco.editor.defineTheme("cocode-dark", {
       base: "vs-dark",
       inherit: true,
@@ -586,11 +644,20 @@ export default function EditorPage() {
     });
   }
 
-  function handleEditorDidMount(editor) {
+  function handleEditorDidMount(editor, monaco) {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    if (activeFileId && viewStatesRef.current.has(activeFileId)) {
+      const vs = viewStatesRef.current.get(activeFileId);
+      if (vs) {
+        try {
+          editor.restoreViewState(vs);
+        } catch {}
+      }
+    }
   }
 
-  // Set up Yjs CRDT Monaco Binding for the active file
+  // Set up Yjs Monaco Binding for collaborative room active file (Phase 6)
   useEffect(() => {
     if (!roomId || !editorRef.current || !activeFile) return;
 
@@ -605,14 +672,23 @@ export default function EditorPage() {
     }
 
     const yText = doc.getText("monaco");
-    const model = editorRef.current.getModel();
+    let model = editorRef.current.getModel();
+    if (monacoRef.current) {
+      const targetUri = monacoRef.current.Uri.parse(activeFile.path || activeFile.id);
+      const targetModel = monacoRef.current.editor.getModel(targetUri);
+      if (targetModel) {
+        model = targetModel;
+        if (editorRef.current.getModel() !== targetModel) {
+          editorRef.current.setModel(targetModel);
+        }
+      }
+    }
     if (!model) return;
 
     if (yText.length === 0 && activeFile.content) {
       yText.insert(0, activeFile.content);
     }
 
-    // Clean up previous binding
     if (yBindingRef.current) {
       try {
         yBindingRef.current.destroy();
@@ -620,13 +696,11 @@ export default function EditorPage() {
       yBindingRef.current = null;
     }
 
-    // Ensure model matches yText on file switch
     const currentText = yText.toString();
     if (model.getValue() !== currentText) {
       model.setValue(currentText);
     }
 
-    // Listen for local updates from Monaco edits and emit incremental binary update to room
     const handleLocalUpdate = (update, origin) => {
       if (origin !== "remote" && socketRef.current && socketRef.current.connected) {
         socketRef.current.emit("yjs:update", {
@@ -641,11 +715,7 @@ export default function EditorPage() {
 
     let binding = null;
     try {
-      binding = new MonacoBinding(
-        yText,
-        model,
-        new Set([editorRef.current])
-      );
+      binding = new MonacoBinding(yText, model, new Set([editorRef.current]));
       yBindingRef.current = binding;
     } catch (err) {
       console.warn("MonacoBinding initialization:", err);
@@ -662,167 +732,345 @@ export default function EditorPage() {
     };
   }, [roomId, activeFile?.id]);
 
-  // Handle Code Change
-  function handleCodeChange(newContent) {
-    if (!activeFile) return;
-    const content = newContent || "";
+  // Save current editor view state (scroll, cursor, selection)
+  const saveCurrentViewState = useCallback(() => {
+    if (activeFileId && editorRef.current) {
+      try {
+        const vs = editorRef.current.saveViewState();
+        if (vs) {
+          viewStatesRef.current.set(activeFileId, vs);
+        }
+      } catch {}
+    }
+  }, [activeFileId]);
 
-    // In local standalone mode (!roomId), update state directly
-    if (!roomId) {
-      setFiles((prev) =>
-        prev.map((f) => (f.id === activeFile.id ? { ...f, content } : f))
-      );
-      setDirtyFiles((prev) => ({ ...prev, [activeFile.id]: true }));
+  // Switch active file while preserving editor view state (Phase 8.9)
+  const switchActiveFile = useCallback(
+    (nextFileId) => {
+      if (activeFileId === nextFileId) return;
+      saveCurrentViewState();
+      setActiveFileId(nextFileId);
+    },
+    [activeFileId, saveCurrentViewState]
+  );
+
+  // Restore editor view state when active file changes
+  useEffect(() => {
+    if (!editorRef.current || !activeFileId) return;
+    const savedVs = viewStatesRef.current.get(activeFileId);
+    if (savedVs) {
+      const raf = requestAnimationFrame(() => {
+        if (editorRef.current && activeFileIdRef.current === activeFileId) {
+          try {
+            editorRef.current.restoreViewState(savedVs);
+            editorRef.current.focus();
+          } catch {}
+        }
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      editorRef.current.focus();
+    }
+  }, [activeFileId]);
+
+  // Save a specific file by ID with revision snapshot & in-flight tracking (Phase 8.9)
+  const saveFileById = useCallback(
+    async (fileId) => {
+      if (!fileId) return;
+      const file = files.find((f) => f.id === fileId);
+      if (!file || file.isFolder) return;
+
+      // Clear pending autosave timer for this specific file
+      const timer = autoSaveTimersRef.current.get(fileId);
+      if (timer) {
+        clearTimeout(timer);
+        autoSaveTimersRef.current.delete(fileId);
+      }
+
+      // If a save is already in-flight for this file, flag that it needs re-saving once finished
+      if (fileSavingInFlightRef.current.get(fileId)) {
+        fileNeedsReSaveRef.current.set(fileId, true);
+        return;
+      }
+
+      // Optional format on save if active file
+      if (editorSettings.formatOnSave && activeFileId === fileId && editorRef.current) {
+        try {
+          editorRef.current.getAction("editor.action.formatDocument")?.run();
+        } catch {}
+      }
+
+      // Capture exact target version and fresh content snapshot at this instant
+      const targetVersion = fileVersionRef.current.get(fileId) || 0;
+      const contentToSave = getLatestFileContent(fileId);
+
+      fileSavingInFlightRef.current.set(fileId, true);
+      fileNeedsReSaveRef.current.delete(fileId);
+
+      if (activeFileId === fileId) {
+        setSaveStatus("saving");
+      }
+
+      if (projectId && token) {
+        try {
+          const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${fileId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              content: contentToSave,
+              language: file.language || "javascript",
+            }),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Failed to save file to server (${res.status})`);
+          }
+
+          fileSavedVersionRef.current.set(fileId, targetVersion);
+
+          // Clear dirty state only if no new edits arrived during save
+          const currentVersion = fileVersionRef.current.get(fileId) || 0;
+          if (currentVersion === targetVersion) {
+            setDirtyFiles((prev) => {
+              const next = { ...prev };
+              delete next[fileId];
+              return next;
+            });
+            if (activeFileId === fileId) {
+              setSaveStatus("saved");
+            }
+          }
+          showToast(`Saved ${file.name}`);
+        } catch (err) {
+          console.error("Save file error:", err);
+          if (activeFileId === fileId) {
+            setSaveStatus("error");
+          }
+        } finally {
+          fileSavingInFlightRef.current.delete(fileId);
+
+          // If newer content was edited while request was running, immediately persist newer edits
+          if (
+            fileNeedsReSaveRef.current.get(fileId) ||
+            (fileVersionRef.current.get(fileId) || 0) > targetVersion
+          ) {
+            fileNeedsReSaveRef.current.delete(fileId);
+            saveFileById(fileId);
+          }
+        }
+      } else {
+        // Local standalone save
+        fileSavedVersionRef.current.set(fileId, targetVersion);
+        const currentVersion = fileVersionRef.current.get(fileId) || 0;
+        if (currentVersion === targetVersion) {
+          setDirtyFiles((prev) => {
+            const next = { ...prev };
+            delete next[fileId];
+            return next;
+          });
+          if (activeFileId === fileId) {
+            setSaveStatus("saved");
+          }
+        }
+        fileSavingInFlightRef.current.delete(fileId);
+        showToast(`Saved ${file.name} (local)`);
+      }
+
+      // Add version revision snapshot
+      const newRev = {
+        id: `rev-${Date.now()}`,
+        fileId,
+        filename: file.name,
+        timestamp: Date.now(),
+        content: contentToSave,
+        author: user?.name || "Developer",
+      };
+      setFileRevisions((prev) => [newRev, ...prev]);
+    },
+    [
+      files,
+      activeFileId,
+      editorSettings.formatOnSave,
+      getLatestFileContent,
+      projectId,
+      token,
+      user?.name,
+      showToast,
+    ]
+  );
+
+  // Save current active file
+  const saveCurrentFile = useCallback(async () => {
+    if (!activeFileId) return;
+    await saveFileById(activeFileId);
+  }, [activeFileId, saveFileById]);
+
+  // Save All open modified files with content snapshot verification (Phase 8.9)
+  const saveAllFiles = useCallback(async () => {
+    const dirtyIds = Object.keys(dirtyFiles).filter((id) => dirtyFiles[id]);
+    if (dirtyIds.length === 0) {
+      showToast("All files are up to date.");
       return;
     }
 
-    // In room mode, Yjs is authoritative. Update dirty state and files cache for run/download
-    // without triggering controlled Monaco resets.
-    setDirtyFiles((prev) => ({ ...prev, [activeFile.id]: true }));
-    setFiles((prev) =>
-      prev.map((f) => (f.id === activeFile.id ? { ...f, content } : f))
-    );
+    // Cancel pending autosaves for all dirty files
+    dirtyIds.forEach((id) => {
+      const timer = autoSaveTimersRef.current.get(id);
+      if (timer) {
+        clearTimeout(timer);
+        autoSaveTimersRef.current.delete(id);
+      }
+    });
 
-    // Fallback broadcast if in room AND this change was made without active Yjs binding
-    if (socketRef.current && !isRemoteUpdateRef.current && !yBindingRef.current) {
-      socketRef.current.emit("code:update", {
-        roomCode: roomId,
-        fileId: activeFile.id,
-        content,
-        language: activeFile.language || "javascript",
-      });
-    }
-  }
+    // Capture exact snapshot of content and versions at this instant
+    const snapshot = dirtyIds.map((id) => {
+      const f = files.find((file) => file.id === id);
+      return {
+        id,
+        name: f?.name || id,
+        language: f?.language || "javascript",
+        content: getLatestFileContent(id),
+        version: fileVersionRef.current.get(id) || 0,
+      };
+    });
 
-  // Leave room action
-  function handleLeaveRoom() {
-    if (yBindingRef.current) {
+    setSaveStatus("saving");
+
+    if (projectId && token) {
       try {
-        yBindingRef.current.destroy();
-      } catch {}
-      yBindingRef.current = null;
-    }
-    yDocsRef.current.clear();
-
-    if (socketRef.current) {
-      socketRef.current.emit("room:leave");
-      socketRef.current.disconnect();
-    }
-    navigate("/rooms/join");
-  }
-
-  // Copy room code to clipboard
-  async function copyRoomCode() {
-    if (!roomId) return;
-    try {
-      await navigator.clipboard.writeText(roomId);
-      setRoomCopied(true);
-      setTimeout(() => setRoomCopied(false), 2000);
-    } catch {
-      alert(`Room code: ${roomId}`);
-    }
-  }
-
-  // Save current file revision
-  async function saveCurrentFile() {
-    if (!activeFile) return;
-
-    if (projectId && token && !activeFile.isFolder) {
-      setSaveStatus("saving");
-      try {
-        const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${activeFile.id}`, {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/save-all`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            content: activeFile.content || "",
-            language: activeFile.language || "javascript",
+            files: snapshot.map((s) => ({
+              id: s.id,
+              content: s.content,
+              language: s.language,
+            })),
           }),
         });
 
         if (!res.ok) {
-          throw new Error("Failed to save file to server.");
+          throw new Error(`Failed to batch save files (${res.status})`);
         }
 
-        setSaveStatus("saved");
+        // Only clear dirty state for files whose version has not changed while request was in-flight
         setDirtyFiles((prev) => {
           const next = { ...prev };
-          delete next[activeFile.id];
+          snapshot.forEach((item) => {
+            const currentVersion = fileVersionRef.current.get(item.id) || 0;
+            if (currentVersion === item.version) {
+              delete next[item.id];
+              fileSavedVersionRef.current.set(item.id, item.version);
+            }
+          });
           return next;
         });
+
+        setSaveStatus("saved");
+        showToast(`Saved ${snapshot.length} modified files.`);
       } catch (err) {
-        console.error("Save file error:", err);
+        console.error("Save all error:", err);
         setSaveStatus("error");
+        showToast("Save all failed. Dirty changes retained.");
       }
     } else {
+      // Local standalone save
       setDirtyFiles((prev) => {
         const next = { ...prev };
-        delete next[activeFile.id];
+        snapshot.forEach((item) => {
+          const currentVersion = fileVersionRef.current.get(item.id) || 0;
+          if (currentVersion === item.version) {
+            delete next[item.id];
+            fileSavedVersionRef.current.set(item.id, item.version);
+          }
+        });
         return next;
+      });
+      setSaveStatus("saved");
+      showToast(`Saved ${snapshot.length} files (local).`);
+    }
+  }, [dirtyFiles, files, getLatestFileContent, projectId, token, showToast]);
+
+  // Handle Code Change with per-file debounced autosave (Phase 8.9)
+  function handleCodeChange(newContent) {
+    if (!activeFile) return;
+    const fileId = activeFile.id;
+    const content = newContent || "";
+
+    // Increment per-file revision counter and update live cache
+    const newVersion = (fileVersionRef.current.get(fileId) || 0) + 1;
+    fileVersionRef.current.set(fileId, newVersion);
+    fileContentRef.current.set(fileId, content);
+
+    // Update dirty state and unsaved indicator
+    setDirtyFiles((prev) => ({ ...prev, [fileId]: true }));
+    if (fileId === activeFileId) {
+      setSaveStatus("unsaved");
+    }
+
+    // Update in-memory file list
+    setFiles((prev) =>
+      prev.map((f) => (f.id === fileId ? { ...f, content } : f))
+    );
+
+    // Collaboration room broadcast fallback
+    if (roomId && socketRef.current && !isRemoteUpdateRef.current && !yBindingRef.current) {
+      socketRef.current.emit("code:update", {
+        roomCode: roomId,
+        fileId,
+        content,
+        language: activeFile.language || "javascript",
       });
     }
 
-    const newRev = {
-      id: `rev-${Date.now()}`,
-      fileId: activeFile.id,
-      filename: activeFile.name,
-      timestamp: Date.now(),
-      content: activeFile.content || "",
-      author: user?.name || "Developer",
-    };
-    setFileRevisions((prev) => [newRev, ...prev]);
-  }
+    // Debounced Autosave on a per-file timer (Phase 8.9)
+    if (editorSettings.autoSave) {
+      const existingTimer = autoSaveTimersRef.current.get(fileId);
+      if (existingTimer) clearTimeout(existingTimer);
 
-  // Tab management
-  function openFile(file) {
-    if (file.isFolder) {
-      toggleFolder(file.path);
-      return;
-    }
-    if (!openTabIds.includes(file.id)) {
-      setOpenTabIds((prev) => [...prev, file.id]);
-    }
-    setActiveFileId(file.id);
-  }
+      const delay = editorSettings.autoSaveDelay || 1500;
+      const timerId = setTimeout(() => {
+        autoSaveTimersRef.current.delete(fileId);
+        saveFileById(fileId);
+      }, delay);
 
-  function closeTab(e, tabId) {
-    e.stopPropagation();
-    const remaining = openTabIds.filter((id) => id !== tabId);
-    setOpenTabIds(remaining);
-    if (activeFileId === tabId) {
-      setActiveFileId(remaining[remaining.length - 1] || null);
+      autoSaveTimersRef.current.set(fileId, timerId);
     }
   }
 
-  function toggleFolder(path) {
-    setExpandedFolders((prev) => ({
-      ...prev,
-      [path]: !prev[path],
-    }));
-  }
-
-  // Create new file or folder
-  async function handleCreateItem() {
-    if (!newItemName.trim()) {
-      setNewFileInput(null);
-      return;
+  // Format document action (Phase 8.5)
+  const formatDocument = useCallback(() => {
+    if (editorRef.current) {
+      try {
+        editorRef.current.getAction("editor.action.formatDocument")?.run();
+        showToast("Document formatted");
+      } catch (err) {
+        console.warn("Formatting failed:", err);
+      }
     }
-    const cleanName = newItemName.trim();
-    const parentPath = newFileInput?.parentPath || "";
-    const path = `${parentPath}/${cleanName}`.replace(/\/+/g, "/");
+  }, [showToast]);
 
-    // Detect language from extension
+  // File and Folder operations (Phase 8.2)
+  async function handleCreateFile(parentPath, name) {
+    const cleanPath = `${parentPath}/${name}`.replace(/\/+/g, "/");
+
     let language = "javascript";
-    if (cleanName.endsWith(".py")) language = "python";
-    else if (cleanName.endsWith(".cpp") || cleanName.endsWith(".cc")) language = "cpp";
-    else if (cleanName.endsWith(".c")) language = "c";
-    else if (cleanName.endsWith(".html")) language = "html";
-    else if (cleanName.endsWith(".css")) language = "css";
-    else if (cleanName.endsWith(".json")) language = "json";
+    if (name.endsWith(".py")) language = "python";
+    else if (name.endsWith(".cpp") || name.endsWith(".cc")) language = "cpp";
+    else if (name.endsWith(".c")) language = "c";
+    else if (name.endsWith(".html")) language = "html";
+    else if (name.endsWith(".css")) language = "css";
+    else if (name.endsWith(".json")) language = "json";
+    else if (name.endsWith(".md")) language = "markdown";
 
-    if (projectId && token && !newFileInput?.isFolder) {
+    if (projectId && token) {
       try {
         const res = await fetch(`${API_BASE}/api/projects/${projectId}/files`, {
           method: "POST",
@@ -831,8 +1079,8 @@ export default function EditorPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            name: cleanName,
-            path,
+            name,
+            path: cleanPath,
             language,
             content: "",
           }),
@@ -850,96 +1098,290 @@ export default function EditorPage() {
           id: serverFile.id,
           name: serverFile.name,
           path: serverFile.path,
-          isFolder: false,
           language: serverFile.language,
           content: serverFile.content || "",
+          isFolder: false,
         };
 
         setFiles((prev) => [...prev, newItem]);
         setOpenTabIds((prev) => [...prev, newItem.id]);
         setActiveFileId(newItem.id);
+        showToast(`Created ${name}`);
       } catch (err) {
         alert(err.message || "Failed to create file.");
       }
     } else {
       const newItem = {
         id: `f-${Date.now()}`,
-        name: cleanName,
-        path,
-        isFolder: Boolean(newFileInput?.isFolder),
+        name,
+        path: cleanPath,
         language,
-        content: newFileInput?.isFolder ? undefined : "",
+        content: "",
+        isFolder: false,
       };
 
       setFiles((prev) => [...prev, newItem]);
-      if (!newItem.isFolder) {
-        setOpenTabIds((prev) => [...prev, newItem.id]);
-        setActiveFileId(newItem.id);
-      }
+      setOpenTabIds((prev) => [...prev, newItem.id]);
+      setActiveFileId(newItem.id);
+      showToast(`Created ${name}`);
     }
-
-    setNewFileInput(null);
-    setNewItemName("");
   }
 
-  // Delete file or folder
-  async function handleDeleteItem(item, e) {
-    e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to delete "${item.name}"?`)) return;
+  async function handleCreateFolder(parentPath, name) {
+    const cleanPath = `${parentPath}/${name}`.replace(/\/+/g, "/");
 
-    if (projectId && token && !item.isFolder) {
+    if (projectId && token) {
       try {
-        const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${item.id}`, {
-          method: "DELETE",
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/folders`, {
+          method: "POST",
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ path: cleanPath }),
         });
 
         if (!res.ok) {
-          throw new Error("Failed to delete file from project.");
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || errData.message || "Failed to create folder.");
         }
+
+        // Add placeholder marker file so folder is retained in tree
+        const keepItem = {
+          id: `keep-${Date.now()}`,
+          name: ".cocode-keep",
+          path: `${cleanPath}/.cocode-keep`,
+          language: "text",
+          content: "",
+          isFolder: false,
+        };
+        setFiles((prev) => [...prev, keepItem]);
+        setExpandedFolders((prev) => ({ ...prev, [cleanPath]: true }));
+        showToast(`Created folder ${name}`);
       } catch (err) {
-        alert(err.message || "Failed to delete file.");
-        return;
+        alert(err.message || "Failed to create folder.");
+      }
+    } else {
+      const folderItem = {
+        id: `folder-${Date.now()}`,
+        name,
+        path: cleanPath,
+        isFolder: true,
+      };
+      setFiles((prev) => [...prev, folderItem]);
+      setExpandedFolders((prev) => ({ ...prev, [cleanPath]: true }));
+      showToast(`Created folder ${name}`);
+    }
+  }
+
+  async function handleRenameItem(item, newName) {
+    const parent = item.path.substring(0, item.path.lastIndexOf("/"));
+    const newPath = `${parent}/${newName}`.replace(/\/+/g, "/");
+
+    if (item.isFolder) {
+      if (projectId && token) {
+        try {
+          const res = await fetch(`${API_BASE}/api/projects/${projectId}/folders`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ oldPath: item.path, newPath }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || errData.message || "Failed to rename folder.");
+          }
+
+          setFiles((prev) =>
+            prev.map((f) => {
+              if (f.path === item.path) {
+                return { ...f, name: newName, path: newPath };
+              }
+              if (f.path.startsWith(`${item.path}/`)) {
+                return { ...f, path: f.path.replace(item.path, newPath) };
+              }
+              return f;
+            })
+          );
+          showToast(`Renamed folder to ${newName}`);
+        } catch (err) {
+          alert(err.message || "Failed to rename folder.");
+        }
+      } else {
+        setFiles((prev) =>
+          prev.map((f) => {
+            if (f.path === item.path) {
+              return { ...f, name: newName, path: newPath };
+            }
+            if (f.path.startsWith(`${item.path}/`)) {
+              return { ...f, path: f.path.replace(item.path, newPath) };
+            }
+            return f;
+          })
+        );
+      }
+    } else {
+      // Rename file
+      if (projectId && token) {
+        try {
+          const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${item.id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ name: newName, path: newPath }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || errData.message || "Failed to rename file.");
+          }
+
+          setFiles((prev) =>
+            prev.map((f) => (f.id === item.id ? { ...f, name: newName, path: newPath } : f))
+          );
+          showToast(`Renamed to ${newName}`);
+        } catch (err) {
+          alert(err.message || "Failed to rename file.");
+        }
+      } else {
+        setFiles((prev) =>
+          prev.map((f) => (f.id === item.id ? { ...f, name: newName, path: newPath } : f))
+        );
       }
     }
-
-    setFiles((prev) =>
-      prev.filter((f) => f.id !== item.id && !f.path.startsWith(`${item.path}/`))
-    );
-    setOpenTabIds((prev) => prev.filter((id) => id !== item.id));
-    if (activeFileId === item.id) {
-      setActiveFileId(null);
-    }
   }
 
-  // Rename item
-  function handleRenameItem(item, e) {
-    e.stopPropagation();
-    setRenamingId(item.id);
-    setRenameValue(item.name);
+  function confirmDeleteItem(item) {
+    const isFolder = item.isFolder;
+    setConfirmModal({
+      isOpen: true,
+      title: isFolder ? `Delete Folder "${item.name}"?` : `Delete File "${item.name}"?`,
+      message: isFolder
+        ? `Are you sure you want to delete folder "${item.name}" and all of its contents? This action cannot be undone.`
+        : `Are you sure you want to delete file "${item.name}"? This action cannot be undone.`,
+      confirmText: "Delete",
+      confirmVariant: "danger",
+      onConfirm: () => performDeleteItem(item),
+    });
   }
 
-  function submitRename(item) {
-    if (renameValue.trim() && renameValue.trim() !== item.name) {
-      const newName = renameValue.trim();
-      const parent = item.path.substring(0, item.path.lastIndexOf("/"));
-      const newPath = `${parent}/${newName}`.replace(/\/+/g, "/");
+  async function performDeleteItem(item) {
+    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+
+    if (item.isFolder) {
+      if (projectId && token) {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/projects/${projectId}/folders?path=${encodeURIComponent(item.path)}`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (!res.ok) throw new Error("Failed to delete folder.");
+        } catch (err) {
+          alert(err.message || "Failed to delete folder.");
+          return;
+        }
+      }
 
       setFiles((prev) =>
-        prev.map((f) => {
-          if (f.id === item.id) {
-            return { ...f, name: newName, path: newPath };
-          }
-          if (f.path.startsWith(`${item.path}/`)) {
-            return { ...f, path: f.path.replace(item.path, newPath) };
-          }
-          return f;
+        prev.filter((f) => f.path !== item.path && !f.path.startsWith(`${item.path}/`))
+      );
+      // Close tabs for deleted nested files
+      setOpenTabIds((prev) =>
+        prev.filter((id) => {
+          const f = files.find((itemF) => itemF.id === id);
+          return f && !f.path.startsWith(`${item.path}/`) && f.path !== item.path;
         })
       );
+      showToast(`Deleted folder ${item.name}`);
+    } else {
+      if (projectId && token) {
+        try {
+          const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${item.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("Failed to delete file.");
+        } catch (err) {
+          alert(err.message || "Failed to delete file.");
+          return;
+        }
+      }
+
+      setFiles((prev) => prev.filter((f) => f.id !== item.id));
+      setOpenTabIds((prev) => prev.filter((id) => id !== item.id));
+      if (activeFileId === item.id) {
+        const remaining = openTabIds.filter((id) => id !== item.id);
+        setActiveFileId(remaining[remaining.length - 1] || null);
+      }
+      showToast(`Deleted ${item.name}`);
     }
-    setRenamingId(null);
+  }
+
+  // Tab management (Phase 8.3)
+  function openFile(file) {
+    if (!file || file.isFolder) return;
+    if (!openTabIds.includes(file.id)) {
+      setOpenTabIds((prev) => [...prev, file.id]);
+    }
+    switchActiveFile(file.id);
+  }
+
+  function handleCloseTab(e, tabId) {
+    if (e) e.stopPropagation();
+
+    // Check unsaved changes
+    if (dirtyFiles[tabId]) {
+      const file = files.find((f) => f.id === tabId);
+      setConfirmModal({
+        isOpen: true,
+        title: `Discard Changes in "${file?.name || "file"}"?`,
+        message: "You have unsaved changes in this file. Closing this tab will discard them.",
+        confirmText: "Discard & Close",
+        confirmVariant: "danger",
+        onConfirm: () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          setDirtyFiles((prev) => {
+            const next = { ...prev };
+            delete next[tabId];
+            return next;
+          });
+          closeTabFinal(tabId);
+        },
+      });
+      return;
+    }
+
+    closeTabFinal(tabId);
+  }
+
+  function closeTabFinal(tabId) {
+    const remaining = openTabIds.filter((id) => id !== tabId);
+    setOpenTabIds(remaining);
+    if (activeFileId === tabId) {
+      const nextId = remaining[remaining.length - 1] || null;
+      switchActiveFile(nextId);
+    }
+  }
+
+  function closeAllTabs() {
+    saveCurrentViewState();
+    setOpenTabIds([]);
+    setActiveFileId(null);
+  }
+
+  function toggleFolder(path, forceOpen) {
+    setExpandedFolders((prev) => ({
+      ...prev,
+      [path]: forceOpen !== undefined ? forceOpen : !prev[path],
+    }));
   }
 
   // Upload Files handler
@@ -974,11 +1416,11 @@ export default function EditorPage() {
     });
   }
 
-  // Download complete project as ZIP archive using JSZip
+  // Download project as ZIP
   async function handleDownloadCode() {
     const zip = new JSZip();
     files.forEach((f) => {
-      if (!f.isFolder) {
+      if (!f.isFolder && f.name !== ".cocode-keep") {
         const cleanPath = f.path.replace(/^\/+/, "");
         zip.file(cleanPath, f.content || "");
       }
@@ -987,9 +1429,10 @@ export default function EditorPage() {
     const blob = await zip.generateAsync({ type: "blob" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `cocode-project-${roomId || "workspace"}.zip`;
+    link.download = `cocode-project-${roomId || projectData?.name || "workspace"}.zip`;
     link.click();
     URL.revokeObjectURL(link.href);
+    showToast("Downloaded project archive");
   }
 
   // Execute Code via backend Judge0 compiler API
@@ -1053,46 +1496,7 @@ export default function EditorPage() {
     }
   }
 
-  // AI Assistant action
-  async function handleAiAssist(actionType, extraPrompt = "") {
-    if (!activeFile) return;
-    setAiLoading(true);
-    setActiveActivityTab("ai");
-
-    const promptText = extraPrompt || aiPrompt || `Explain the following ${activeFile.language} code:\n\n${activeFile.content}`;
-
-    try {
-      const res = await fetch(`${API_BASE}/api/ai/assist`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          action: actionType,
-          language: activeFile.language,
-          code: activeFile.content,
-          prompt: promptText,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "AI service unavailable.");
-      setAiResponse(data.reply || data.output || "AI response generated successfully.");
-    } catch (err) {
-      // Graceful informative fallback
-      setAiResponse(
-        `💡 AI Assistant (${actionType}):\n` +
-        `This file is written in ${activeFile.language.toUpperCase()}.\n` +
-        `Key components detected: functions and standard log routines.\n\n` +
-        `To enable live AI inference with OpenAI/Gemini, set AI_API_KEY in server/.env.`
-      );
-    } finally {
-      setAiLoading(false);
-    }
-  }
-
-  // Chat message send
+  // Chat message send (Phase 6)
   function handleSendMessage(e) {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -1120,30 +1524,171 @@ export default function EditorPage() {
     }
   }
 
-  // Global search filtering
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const query = matchCase ? searchQuery : searchQuery.toLowerCase();
-    const results = [];
+  // Project-wide Search (Phase 8.4)
+  const performProjectSearch = useCallback(async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
 
-    files.forEach((f) => {
-      if (f.isFolder) return;
-      const content = f.content || "";
-      const lines = content.split("\n");
-      lines.forEach((line, lineIdx) => {
-        const lineText = matchCase ? line : line.toLowerCase();
-        if (lineText.includes(query)) {
-          results.push({
-            file: f,
-            lineNumber: lineIdx + 1,
-            lineText: line.trim(),
-          });
+    setIsSearching(true);
+    if (projectId && token) {
+      try {
+        const queryParams = new URLSearchParams({
+          q: searchQuery.trim(),
+          matchCase: matchCase ? "true" : "false",
+          wholeWord: wholeWord ? "true" : "false",
+        });
+
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/search?${queryParams.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.matches || []);
         }
-      });
-    });
+      } catch (err) {
+        console.warn("Server search failed, falling back to local:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      // Local search across loaded project files
+      const q = matchCase ? searchQuery : searchQuery.toLowerCase();
+      const results = [];
 
-    return results;
-  }, [files, searchQuery, matchCase]);
+      files.forEach((f) => {
+        if (f.isFolder || f.name === ".cocode-keep") return;
+        const lines = (f.content || "").split("\n");
+        lines.forEach((line, lineIdx) => {
+          const target = matchCase ? line : line.toLowerCase();
+          if (target.includes(q)) {
+            results.push({
+              fileId: f.id,
+              fileName: f.name,
+              filePath: f.path,
+              lineNumber: lineIdx + 1,
+              lineContent: line.trim(),
+            });
+          }
+        });
+      });
+
+      setSearchResults(results);
+      setIsSearching(false);
+    }
+  }, [searchQuery, matchCase, wholeWord, projectId, token, files]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      performProjectSearch();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [performProjectSearch]);
+
+  // Global Keyboard Shortcuts Listener (Phase 8.7)
+  useEffect(() => {
+    function handleGlobalKeyDown(e) {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      // Ctrl + S : Save current file
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveCurrentFile();
+      }
+      // Ctrl + Shift + S : Save all open files
+      else if (mod && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveAllFiles();
+      }
+      // Ctrl + P : Quick Open
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setIsQuickOpenOpen(true);
+      }
+      // Ctrl + Shift + P or F1 : Command Palette
+      else if ((mod && e.shiftKey && e.key.toLowerCase() === "p") || e.key === "F1") {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
+      }
+      // Ctrl + F : Find
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setIsFindOpen(true);
+      }
+      // Ctrl + H : Replace
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        setIsFindOpen(true);
+      }
+      // Ctrl + Shift + F : Search in project
+      else if (mod && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setActiveActivityTab("search");
+      }
+      // Ctrl + B : Toggle explorer
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setActiveActivityTab((cur) => (cur === "files" ? null : "files"));
+      }
+      // Ctrl + ` : Toggle Terminal bottom panel
+      else if (mod && e.key === "`") {
+        e.preventDefault();
+        setIsBottomPanelCollapsed((cur) => !cur);
+      }
+      // Alt + Shift + F : Format Document
+      else if (e.altKey && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        formatDocument();
+      }
+      // Ctrl + Enter : Run Code
+      else if (mod && e.key === "Enter") {
+        e.preventDefault();
+        handleRunCode();
+      }
+      // Ctrl + W : Close active tab
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        if (activeFileId) {
+          handleCloseTab(null, activeFileId);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [saveCurrentFile, saveAllFiles, formatDocument, activeFileId]);
+
+  // Leave room action (Phase 6)
+  function handleLeaveRoom() {
+    if (yBindingRef.current) {
+      try {
+        yBindingRef.current.destroy();
+      } catch {}
+      yBindingRef.current = null;
+    }
+    yDocsRef.current.clear();
+
+    if (socketRef.current) {
+      socketRef.current.emit("room:leave");
+      socketRef.current.disconnect();
+    }
+    navigate("/rooms/join");
+  }
+
+  // Copy room code
+  async function copyRoomCode() {
+    if (!roomId) return;
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setRoomCopied(true);
+      setTimeout(() => setRoomCopied(false), 2000);
+    } catch {
+      alert(`Room code: ${roomId}`);
+    }
+  }
 
   // Language icon badge helper
   function renderLanguageBadge(lang) {
@@ -1158,6 +1703,153 @@ export default function EditorPage() {
     return <span className="ide-file-badge badge-generic">DOC</span>;
   }
 
+  // Command Palette items list (Phase 8.7)
+  const paletteCommands = useMemo(() => {
+    return [
+      {
+        id: "cmd-new-file",
+        label: "New File",
+        category: "File",
+        shortcut: "Ctrl+N",
+        icon: <FilePlus size={14} className="text-sky" />,
+        action: () => {
+          setActiveActivityTab("files");
+          const name = prompt("Enter file name (e.g. script.js):");
+          if (name) handleCreateFile("", name);
+        },
+      },
+      {
+        id: "cmd-new-folder",
+        label: "New Folder",
+        category: "File",
+        icon: <FolderPlus size={14} className="text-sky" />,
+        action: () => {
+          setActiveActivityTab("files");
+          const name = prompt("Enter folder name (e.g. utils):");
+          if (name) handleCreateFolder("", name);
+        },
+      },
+      {
+        id: "cmd-save",
+        label: "Save File",
+        category: "File",
+        shortcut: "Ctrl+S",
+        icon: <Save size={14} className="text-sky" />,
+        action: saveCurrentFile,
+      },
+      {
+        id: "cmd-save-all",
+        label: "Save All Files",
+        category: "File",
+        shortcut: "Ctrl+Shift+S",
+        icon: <Save size={14} className="text-emerald" />,
+        action: saveAllFiles,
+      },
+      {
+        id: "cmd-quick-open",
+        label: "Quick Open File",
+        category: "File",
+        shortcut: "Ctrl+P",
+        icon: <Files size={14} className="text-amber" />,
+        action: () => setIsQuickOpenOpen(true),
+      },
+      {
+        id: "cmd-find",
+        label: "Find in Current File",
+        category: "Edit",
+        shortcut: "Ctrl+F",
+        icon: <Search size={14} className="text-sky" />,
+        action: () => setIsFindOpen(true),
+      },
+      {
+        id: "cmd-format",
+        label: "Format Document",
+        category: "Edit",
+        shortcut: "Alt+Shift+F",
+        icon: <Wrench size={14} className="text-sky" />,
+        action: formatDocument,
+      },
+      {
+        id: "cmd-project-search",
+        label: "Search across Project",
+        category: "Search",
+        shortcut: "Ctrl+Shift+F",
+        icon: <Search size={14} className="text-cyan" />,
+        action: () => setActiveActivityTab("search"),
+      },
+      {
+        id: "cmd-run-code",
+        label: "Run Code",
+        category: "Run",
+        shortcut: "Ctrl+Enter",
+        icon: <Play size={14} className="text-emerald" />,
+        action: handleRunCode,
+      },
+      {
+        id: "cmd-toggle-terminal",
+        label: "Toggle Integrated Terminal",
+        category: "View",
+        shortcut: "Ctrl+`",
+        icon: <Terminal size={14} className="text-sky" />,
+        action: () => {
+          setIsBottomPanelCollapsed((cur) => !cur);
+          setBottomPanelTab("terminal");
+        },
+      },
+      {
+        id: "cmd-toggle-explorer",
+        label: "Toggle File Explorer",
+        category: "View",
+        shortcut: "Ctrl+B",
+        icon: <Files size={14} className="text-slate" />,
+        action: () => setActiveActivityTab((cur) => (cur === "files" ? null : "files")),
+      },
+      {
+        id: "cmd-close-tab",
+        label: "Close Current Tab",
+        category: "Tab",
+        shortcut: "Ctrl+W",
+        icon: <X size={14} className="text-rose" />,
+        action: () => {
+          if (activeFileId) handleCloseTab(null, activeFileId);
+        },
+      },
+      {
+        id: "cmd-close-all-tabs",
+        label: "Close All Tabs",
+        category: "Tab",
+        icon: <X size={14} className="text-rose" />,
+        action: closeAllTabs,
+      },
+      {
+        id: "cmd-toggle-minimap",
+        label: "Toggle Minimap",
+        category: "Settings",
+        icon: <Sliders size={14} className="text-sky" />,
+        action: () =>
+          setEditorSettings((prev) => ({ ...prev, minimap: !prev.minimap })),
+      },
+      {
+        id: "cmd-toggle-wordwrap",
+        label: "Toggle Word Wrap",
+        category: "Settings",
+        icon: <Sliders size={14} className="text-sky" />,
+        action: () =>
+          setEditorSettings((prev) => ({
+            ...prev,
+            wordWrap: prev.wordWrap === "on" ? "off" : "on",
+          })),
+      },
+      {
+        id: "cmd-download-zip",
+        label: "Download Project ZIP",
+        category: "Project",
+        icon: <Download size={14} className="text-sky" />,
+        action: handleDownloadCode,
+      },
+    ];
+  }, [saveCurrentFile, saveAllFiles, formatDocument, handleRunCode, activeFileId]);
+
   return (
     <div className="ide-root">
       {/* ======================================================================
@@ -1169,9 +1861,10 @@ export default function EditorPage() {
             <span className="ide-brand-badge">C</span>
             <span>CoCode</span>
           </Link>
+
           <div className="ide-project-title-badge">
             <span>Project:</span>
-            <strong>{roomId ? `Room ${roomId}` : "Default Workspace"}</strong>
+            <strong>{roomId ? `Room ${roomId}` : projectData?.name || "Workspace"}</strong>
             {roomId && (
               <button
                 className="ide-icon-btn"
@@ -1183,6 +1876,36 @@ export default function EditorPage() {
               </button>
             )}
           </div>
+
+          {/* Save Status Indicator Badge (Phase 8.7) */}
+          <div
+            className={`ide-save-indicator ${saveStatus}`}
+            onClick={saveStatus === "unsaved" || saveStatus === "error" ? saveCurrentFile : undefined}
+            title={
+              saveStatus === "saving"
+                ? "Saving..."
+                : saveStatus === "unsaved"
+                ? "Click to Save (Ctrl+S)"
+                : saveStatus === "error"
+                ? "Failed to save. Click to retry."
+                : "All changes saved"
+            }
+          >
+            {saveStatus === "saved" && <Check size={12} />}
+            {saveStatus === "saving" && <RefreshCw size={12} className="spin" />}
+            {saveStatus === "unsaved" && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} />}
+            {saveStatus === "error" && <AlertTriangle size={12} />}
+            <span>
+              {saveStatus === "saved"
+                ? "Saved"
+                : saveStatus === "saving"
+                ? "Saving..."
+                : saveStatus === "unsaved"
+                ? "Unsaved"
+                : "Save Error"}
+            </span>
+          </div>
+
           {roomId && (
             <div
               className="ide-collab-badge"
@@ -1252,15 +1975,37 @@ export default function EditorPage() {
         </div>
 
         <div className="ide-topbar-right">
+          {/* Quick Command Palette Button */}
+          <button
+            type="button"
+            className="ide-btn-header-secondary"
+            onClick={() => setIsCommandPaletteOpen(true)}
+            title="Command Palette (Ctrl+Shift+P)"
+          >
+            <Sliders size={13} />
+            <span>Commands</span>
+          </button>
+
+          {/* Quick File Open */}
+          <button
+            type="button"
+            className="ide-btn-header-secondary"
+            onClick={() => setIsQuickOpenOpen(true)}
+            title="Quick Open (Ctrl+P)"
+          >
+            <Files size={13} />
+            <span>Open</span>
+          </button>
+
           {isExecuting ? (
             <button className="ide-btn-header-stop" onClick={() => setIsExecuting(false)}>
               <Square size={13} fill="currentColor" />
               <span>Stop</span>
             </button>
           ) : (
-            <button className="ide-btn-header-run" onClick={handleRunCode} title="Run current code (Ctrl+Enter)">
+            <button className="ide-btn-header-run" onClick={handleRunCode} title="Run Code (Ctrl+Enter)">
               <Play size={13} fill="currentColor" />
-              <span>Run Code</span>
+              <span>Run</span>
             </button>
           )}
 
@@ -1278,7 +2023,7 @@ export default function EditorPage() {
                 ? "Saving..."
                 : dirtyFiles[activeFileId]
                 ? "● Save"
-                : "Saved"}
+                : "Save"}
             </span>
           </button>
 
@@ -1304,6 +2049,31 @@ export default function EditorPage() {
           )}
         </div>
       </header>
+
+      {/* Optional Toast Banner */}
+      {toastMessage && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            right: "24px",
+            zIndex: 2000,
+            background: "#0f172a",
+            border: "1px solid #38bdf8",
+            borderRadius: "6px",
+            padding: "8px 16px",
+            color: "#f8fafc",
+            fontSize: "12px",
+            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <CheckCircle2 size={14} color="#38bdf8" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {roomError && (
         <div
@@ -1341,7 +2111,7 @@ export default function EditorPage() {
             <button
               className={`ide-activity-btn ${activeActivityTab === "files" ? "active" : ""}`}
               onClick={() => setActiveActivityTab(activeActivityTab === "files" ? null : "files")}
-              title="File Explorer (Ctrl+Shift+E)"
+              title="File Explorer (Ctrl+B)"
             >
               <Files size={20} />
             </button>
@@ -1370,16 +2140,9 @@ export default function EditorPage() {
               <Play size={20} />
             </button>
             <button
-              className={`ide-activity-btn ${activeActivityTab === "ai" ? "active" : ""}`}
-              onClick={() => setActiveActivityTab(activeActivityTab === "ai" ? null : "ai")}
-              title="AI Coding Assistant"
-            >
-              <Sparkles size={20} />
-            </button>
-            <button
               className={`ide-activity-btn ${activeActivityTab === "chat" ? "active" : ""}`}
               onClick={() => setActiveActivityTab(activeActivityTab === "chat" ? null : "chat")}
-              title="Chat & Messages"
+              title="Team Chat"
             >
               <MessageSquare size={20} />
               {chatMessages.length > 1 && <span className="badge-counter">{chatMessages.length}</span>}
@@ -1422,7 +2185,7 @@ export default function EditorPage() {
         {/* Sidebar Panel (Toggles with activeActivityTab) */}
         {activeActivityTab && (
           <aside className="ide-sidebar">
-            {/* Panel 1: File Explorer */}
+            {/* Panel 1: File Explorer (Phase 8.2) */}
             {activeActivityTab === "files" && (
               <>
                 <div className="ide-sidebar-header">
@@ -1430,22 +2193,28 @@ export default function EditorPage() {
                   <div className="ide-sidebar-actions">
                     <button
                       className="ide-icon-btn"
-                      onClick={() => setNewFileInput({ parentPath: "", isFolder: false })}
+                      onClick={() => {
+                        const name = prompt("Enter file name (e.g. index.js):");
+                        if (name) handleCreateFile("", name);
+                      }}
                       title="New File"
                     >
                       <FilePlus size={16} />
                     </button>
                     <button
                       className="ide-icon-btn"
-                      onClick={() => setNewFileInput({ parentPath: "", isFolder: true })}
+                      onClick={() => {
+                        const name = prompt("Enter folder name (e.g. components):");
+                        if (name) handleCreateFolder("", name);
+                      }}
                       title="New Folder"
                     >
                       <FolderPlus size={16} />
                     </button>
                     <button
                       className="ide-icon-btn"
-                      onClick={() => setFiles([...DEFAULT_FILES])}
-                      title="Reset Files to Sample"
+                      onClick={fetchProjectData}
+                      title="Refresh Files"
                     >
                       <RefreshCw size={14} />
                     </button>
@@ -1453,96 +2222,22 @@ export default function EditorPage() {
                 </div>
 
                 <div className="ide-sidebar-content">
-                  {/* Inline New File/Folder Input */}
-                  {newFileInput && (
-                    <div style={{ padding: "4px 8px" }}>
-                      <input
-                        autoFocus
-                        className="ide-tree-rename-input"
-                        placeholder={newFileInput.isFolder ? "Folder name..." : "File name (e.g. app.js)..."}
-                        value={newItemName}
-                        onChange={(e) => setNewItemName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleCreateItem();
-                          if (e.key === "Escape") setNewFileInput(null);
-                        }}
-                        onBlur={handleCreateItem}
-                      />
-                    </div>
-                  )}
-
-                  {/* Render files and folders */}
-                  {files.map((item) => {
-                    if (item.isFolder) {
-                      const isExpanded = expandedFolders[item.path];
-                      return (
-                        <div
-                          key={item.id}
-                          className="ide-tree-item"
-                          onClick={() => toggleFolder(item.path)}
-                        >
-                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                          <Folder size={15} color="#38bdf8" />
-                          <span>{item.name}</span>
-                          <div className="ide-tree-item-actions">
-                            <button
-                              className="ide-tree-action-btn"
-                              onClick={(e) => handleDeleteItem(item, e)}
-                              title="Delete Folder"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const isRenaming = renamingId === item.id;
-                    return (
-                      <div
-                        key={item.id}
-                        className={`ide-tree-item ${activeFileId === item.id ? "active" : ""}`}
-                        onClick={() => openFile(item)}
-                      >
-                        {renderLanguageBadge(item.language)}
-                        {isRenaming ? (
-                          <input
-                            autoFocus
-                            className="ide-tree-rename-input"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") submitRename(item);
-                              if (e.key === "Escape") setRenamingId(null);
-                            }}
-                            onBlur={() => submitRename(item)}
-                          />
-                        ) : (
-                          <span>{item.name}</span>
-                        )}
-
-                        <div className="ide-tree-item-actions">
-                          <button
-                            className="ide-tree-action-btn"
-                            onClick={(e) => handleRenameItem(item, e)}
-                            title="Rename"
-                          >
-                            <Edit2 size={12} />
-                          </button>
-                          <button
-                            className="ide-tree-action-btn"
-                            onClick={(e) => handleDeleteItem(item, e)}
-                            title="Delete"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <FileTree
+                    files={files}
+                    activeFileId={activeFileId}
+                    dirtyFiles={dirtyFiles}
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={toggleFolder}
+                    onOpenFile={openFile}
+                    onCreateFile={handleCreateFile}
+                    onCreateFolder={handleCreateFolder}
+                    onRenameItem={handleRenameItem}
+                    onDeleteItem={confirmDeleteItem}
+                    onRefresh={fetchProjectData}
+                  />
                 </div>
 
-                {/* Bottom 3 Pill Buttons (Screenshot Match: Upload Folder, Upload Files, Download Code) */}
+                {/* Bottom 3 Action Buttons */}
                 <div className="ide-sidebar-bottom-actions">
                   <label className="ide-pill-action-btn" style={{ cursor: "pointer" }}>
                     <FolderUp size={16} />
@@ -1576,7 +2271,7 @@ export default function EditorPage() {
               </>
             )}
 
-            {/* Panel 2: Global Search */}
+            {/* Panel 2: Project-Wide Search (Phase 8.4) */}
             {activeActivityTab === "search" && (
               <div className="ide-panel-view">
                 <div className="ide-panel-heading">
@@ -1586,23 +2281,36 @@ export default function EditorPage() {
                 <div className="ide-form-group">
                   <input
                     className="ide-input-text"
-                    placeholder="Search query..."
+                    placeholder="Search term across files (Ctrl+Shift+F)..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
                   />
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a3b8" }}>
-                    <input
-                      type="checkbox"
-                      checked={matchCase}
-                      onChange={(e) => setMatchCase(e.target.checked)}
-                    />
-                    Match Case
-                  </label>
+                  <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a3b8", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={matchCase}
+                        onChange={(e) => setMatchCase(e.target.checked)}
+                      />
+                      Match Case
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a3b8", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={wholeWord}
+                        onChange={(e) => setWholeWord(e.target.checked)}
+                      />
+                      Whole Word
+                    </label>
+                  </div>
                 </div>
 
                 <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {searchResults.length === 0 && searchQuery ? (
-                    <div style={{ color: "#64748b", fontSize: 12 }}>No matches found.</div>
+                  {isSearching ? (
+                    <div style={{ color: "#38bdf8", fontSize: 12 }}>Searching project...</div>
+                  ) : searchResults.length === 0 && searchQuery ? (
+                    <div style={{ color: "#64748b", fontSize: 12 }}>No matches found in project.</div>
                   ) : (
                     searchResults.map((res, i) => (
                       <div
@@ -1610,19 +2318,25 @@ export default function EditorPage() {
                         className="ide-tree-item"
                         style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }}
                         onClick={() => {
-                          openFile(res.file);
-                          if (editorRef.current) {
-                            editorRef.current.revealLineInCenter(res.lineNumber);
-                            editorRef.current.setPosition({ lineNumber: res.lineNumber, column: 1 });
+                          const targetFile = files.find((f) => f.id === res.fileId || f.path === res.filePath);
+                          if (targetFile) {
+                            openFile(targetFile);
+                            if (editorRef.current) {
+                              setTimeout(() => {
+                                editorRef.current.revealLineInCenter(res.lineNumber);
+                                editorRef.current.setPosition({ lineNumber: res.lineNumber, column: 1 });
+                              }, 80);
+                            }
                           }
                         }}
                       >
                         <div style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
-                          <span style={{ color: "#38bdf8", fontWeight: 600 }}>{res.file.name}</span>
+                          <span style={{ color: "#38bdf8", fontWeight: 600 }}>{res.fileName}</span>
                           <span style={{ color: "#64748b", fontSize: 11 }}>:{res.lineNumber}</span>
+                          <span style={{ color: "#475569", fontSize: 10, marginLeft: "auto" }}>{res.filePath}</span>
                         </div>
                         <div style={{ color: "#cbd5e1", fontSize: 11, fontFamily: "monospace" }}>
-                          {res.lineText}
+                          {res.lineContent || res.lineText}
                         </div>
                       </div>
                     ))
@@ -1691,63 +2405,7 @@ export default function EditorPage() {
               </div>
             )}
 
-            {/* Panel 4: AI Coding Assistant */}
-            {activeActivityTab === "ai" && (
-              <div className="ide-panel-view">
-                <div className="ide-panel-heading">
-                  <Sparkles size={16} color="#38bdf8" />
-                  <span>AI Assistant</span>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-                  <button
-                    className="ide-ai-quick-btn"
-                    onClick={() => handleAiAssist("explain", "Explain this code in detail")}
-                  >
-                    <span>💡 Explain Current File</span>
-                  </button>
-                  <button
-                    className="ide-ai-quick-btn"
-                    onClick={() => handleAiAssist("fix", "Suggest fixes for potential errors or bugs")}
-                  >
-                    <span>🔧 Suggest Error Fixes</span>
-                  </button>
-                  <button
-                    className="ide-ai-quick-btn"
-                    onClick={() => handleAiAssist("refactor", "Refactor this code for readability and performance")}
-                  >
-                    <span>⚡ Refactor & Clean Code</span>
-                  </button>
-                </div>
-
-                <div className="ide-form-group">
-                  <textarea
-                    className="ide-input-text"
-                    style={{ minHeight: 60, resize: "vertical" }}
-                    placeholder="Ask AI anything about your code..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                  />
-                  <button
-                    className="ide-pill-action-btn"
-                    style={{ justifyContent: "center" }}
-                    disabled={aiLoading}
-                    onClick={() => handleAiAssist("prompt")}
-                  >
-                    <Sparkles size={14} />
-                    <span>{aiLoading ? "Generating..." : "Ask Assistant"}</span>
-                  </button>
-                </div>
-
-                {aiResponse && (
-                  <div className="ide-ai-response-box">
-                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{aiResponse}</pre>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Panel 5: Real-time Room Chat */}
+            {/* Panel 4: Real-time Room Chat (Phase 6) */}
             {activeActivityTab === "chat" && (
               <div className="ide-panel-view">
                 <div className="ide-panel-heading">
@@ -1785,7 +2443,7 @@ export default function EditorPage() {
               </div>
             )}
 
-            {/* Panel 6: Activity Analytics */}
+            {/* Panel 5: Activity Analytics */}
             {activeActivityTab === "analytics" && (
               <div className="ide-panel-view">
                 <div className="ide-panel-heading">
@@ -1826,7 +2484,7 @@ export default function EditorPage() {
               </div>
             )}
 
-            {/* Panel 7: Teams & Collaborators */}
+            {/* Panel 6: Teams & Collaborators */}
             {activeActivityTab === "teams" && (
               <div className="ide-panel-view">
                 <div className="ide-panel-heading">
@@ -1876,12 +2534,12 @@ export default function EditorPage() {
               </div>
             )}
 
-            {/* Panel 8: Editor Settings */}
+            {/* Panel 7: Editor Settings (Phase 8.7) */}
             {activeActivityTab === "settings" && (
               <div className="ide-panel-view">
                 <div className="ide-panel-heading">
                   <Settings size={16} color="#38bdf8" />
-                  <span>Editor Settings</span>
+                  <span>Editor Preferences</span>
                 </div>
 
                 <div className="ide-form-group">
@@ -1926,7 +2584,64 @@ export default function EditorPage() {
                 </div>
 
                 <div className="ide-form-group">
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <label className="ide-form-label">Theme</label>
+                  <select
+                    className="ide-input-text"
+                    value={editorSettings.theme}
+                    onChange={(e) =>
+                      setEditorSettings((prev) => ({ ...prev, theme: e.target.value }))
+                    }
+                  >
+                    <option value="cocode-dark">CoCode Dark (Default)</option>
+                    <option value="vs-dark">VS Dark</option>
+                  </select>
+                </div>
+
+                <div className="ide-form-group">
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={editorSettings.autoSave}
+                      onChange={(e) =>
+                        setEditorSettings((prev) => ({ ...prev, autoSave: e.target.checked }))
+                      }
+                    />
+                    Enable Autosave
+                  </label>
+                </div>
+
+                {editorSettings.autoSave && (
+                  <div className="ide-form-group">
+                    <label className="ide-form-label">Autosave Delay</label>
+                    <select
+                      className="ide-input-text"
+                      value={editorSettings.autoSaveDelay || 1500}
+                      onChange={(e) =>
+                        setEditorSettings((prev) => ({ ...prev, autoSaveDelay: Number(e.target.value) }))
+                      }
+                    >
+                      <option value="1000">1.0 second</option>
+                      <option value="1500">1.5 seconds</option>
+                      <option value="3000">3.0 seconds</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="ide-form-group">
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={editorSettings.formatOnSave}
+                      onChange={(e) =>
+                        setEditorSettings((prev) => ({ ...prev, formatOnSave: e.target.checked }))
+                      }
+                    />
+                    Format on Save
+                  </label>
+                </div>
+
+                <div className="ide-form-group">
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
                     <input
                       type="checkbox"
                       checked={editorSettings.minimap}
@@ -1940,7 +2655,7 @@ export default function EditorPage() {
               </div>
             )}
 
-            {/* Panel 9: Developer Tools */}
+            {/* Panel 8: Developer Tools */}
             {activeActivityTab === "devtools" && (
               <div className="ide-panel-view">
                 <div className="ide-panel-heading">
@@ -1949,15 +2664,12 @@ export default function EditorPage() {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button
-                    className="ide-pill-action-btn"
-                    onClick={() => {
-                      if (editorRef.current) {
-                        editorRef.current.getAction("editor.action.formatDocument").run();
-                      }
-                    }}
-                  >
+                  <button className="ide-pill-action-btn" onClick={formatDocument}>
                     <span>Format Document</span>
+                  </button>
+
+                  <button className="ide-pill-action-btn" onClick={() => setIsCommandPaletteOpen(true)}>
+                    <span>Open Command Palette (F1)</span>
                   </button>
 
                   <div style={{ background: "#111827", padding: 12, borderRadius: 6, marginTop: 10 }}>
@@ -1966,9 +2678,16 @@ export default function EditorPage() {
                     </div>
                     <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>
                       <li><strong style={{ color: "#f8fafc" }}>Ctrl + S</strong> : Save File</li>
-                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + Enter</strong> : Run Code</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + Shift + S</strong> : Save All</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + P</strong> : Quick Open File</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + Shift + P</strong> : Command Palette</li>
                       <li><strong style={{ color: "#f8fafc" }}>Ctrl + F</strong> : Find</li>
-                      <li><strong style={{ color: "#f8fafc" }}>Alt + Shift + F</strong> : Format</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + H</strong> : Replace</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + Shift + F</strong> : Search in Project</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + B</strong> : Toggle Explorer</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + `</strong> : Toggle Terminal</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Alt + Shift + F</strong> : Format Document</li>
+                      <li><strong style={{ color: "#f8fafc" }}>Ctrl + Enter</strong> : Run Code</li>
                     </ul>
                   </div>
                 </div>
@@ -1981,29 +2700,35 @@ export default function EditorPage() {
             Main Surface (Tabs + Monaco + Floating Pill + Resizable Bottom Drawer)
         ====================================================================== */}
         <main className="ide-main-surface">
-          {/* Tabs Bar */}
+          {/* Multi-Tab Bar (Phase 8.3) */}
           <div className="ide-tabs-bar">
             {openTabIds.map((tabId) => {
               const file = files.find((f) => f.id === tabId);
               if (!file) return null;
               const isActive = activeFileId === tabId;
-              const isDirty = dirtyFiles[tabId];
+              const isDirty = Boolean(dirtyFiles[tabId]);
 
               return (
                 <div
                   key={tabId}
                   className={`ide-tab ${isActive ? "active" : ""}`}
-                  onClick={() => setActiveFileId(tabId)}
+                  onClick={() => switchActiveFile(tabId)}
+                  title={file.path}
                 >
                   {renderLanguageBadge(file.language)}
                   <span className="ide-tab-name">{file.name}</span>
                   {isDirty ? (
-                    <span className="ide-tab-dirty-dot" title="Unsaved changes" />
+                    <span
+                      className="ide-tab-dirty-dot"
+                      title="Unsaved changes. Click to close."
+                      onClick={(e) => handleCloseTab(e, tabId)}
+                    />
                   ) : (
                     <button
+                      type="button"
                       className="ide-tab-close"
-                      onClick={(e) => closeTab(e, tabId)}
-                      title="Close Tab"
+                      onClick={(e) => handleCloseTab(e, tabId)}
+                      title="Close Tab (Ctrl+W)"
                     >
                       <X size={12} />
                     </button>
@@ -2013,25 +2738,36 @@ export default function EditorPage() {
             })}
 
             <button
+              type="button"
               className="ide-tab-add-btn"
-              onClick={() => setNewFileInput({ parentPath: "", isFolder: false })}
+              onClick={() => {
+                const name = prompt("Enter new file name (e.g. index.js):");
+                if (name) handleCreateFile("", name);
+              }}
               title="Add File"
             >
               <Plus size={14} />
             </button>
           </div>
 
-          {/* Monaco Editor Surface */}
+          {/* Monaco Editor Surface with Find/Replace Overlay */}
           <div className="ide-editor-workspace">
+            {/* Find & Replace Floating Widget (Phase 8.4) */}
+            <FindReplaceWidget
+              isOpen={isFindOpen}
+              onClose={() => setIsFindOpen(false)}
+              editor={editorRef.current}
+            />
+
             {activeFile ? (
               <Editor
-                key={roomId ? activeFile.id : "standalone"}
+                key="cocode-monaco-editor"
                 path={activeFile.path || activeFile.id}
                 height="100%"
                 language={activeFile.language || "javascript"}
                 value={roomId ? undefined : (activeFile.content || "")}
                 defaultValue={activeFile.content || ""}
-                theme="cocode-dark"
+                theme={editorSettings.theme || "cocode-dark"}
                 beforeMount={handleEditorWillMount}
                 onMount={handleEditorDidMount}
                 onChange={handleCodeChange}
@@ -2052,18 +2788,26 @@ export default function EditorPage() {
                 }}
               />
             ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748b" }}>
-                Select or create a file from the explorer to begin editing.
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748b", gap: 12 }}>
+                <p>Select or create a file from the explorer to begin editing.</p>
+                <button
+                  type="button"
+                  className="ide-btn-create-sample"
+                  onClick={() => setIsQuickOpenOpen(true)}
+                >
+                  <Files size={14} />
+                  <span>Open File (Ctrl+P)</span>
+                </button>
               </div>
             )}
 
-            {/* Floating pill: "CoCode • Collaborate in real time" (Exact reference screenshot match) */}
+            {/* Floating pill: "CoCode • Collaborate in real time" */}
             <div className="ide-floating-collab-pill">
               <span>CoCode</span> • Collaborate in real time
             </div>
           </div>
 
-          {/* Resizable Bottom Panel (Output / Terminal / Input / History) */}
+          {/* Resizable Bottom Panel (Phase 8.6: Terminal, Output, Stdin, History) */}
           <section
             className="ide-bottom-panel"
             style={{
@@ -2097,16 +2841,29 @@ export default function EditorPage() {
             <div className="ide-bottom-panel-header">
               <div className="ide-bottom-panel-tabs">
                 <button
+                  type="button"
+                  className={`ide-panel-tab ${bottomPanelTab === "terminal" ? "active" : ""}`}
+                  onClick={() => {
+                    setBottomPanelTab("terminal");
+                    setIsBottomPanelCollapsed(false);
+                  }}
+                >
+                  <Terminal size={13} />
+                  <span>Terminal</span>
+                </button>
+                <button
+                  type="button"
                   className={`ide-panel-tab ${bottomPanelTab === "output" ? "active" : ""}`}
                   onClick={() => {
                     setBottomPanelTab("output");
                     setIsBottomPanelCollapsed(false);
                   }}
                 >
-                  <Terminal size={13} />
+                  <Play size={13} />
                   <span>Output</span>
                 </button>
                 <button
+                  type="button"
                   className={`ide-panel-tab ${bottomPanelTab === "stdin" ? "active" : ""}`}
                   onClick={() => {
                     setBottomPanelTab("stdin");
@@ -2116,6 +2873,7 @@ export default function EditorPage() {
                   <span>Input (stdin)</span>
                 </button>
                 <button
+                  type="button"
                   className={`ide-panel-tab ${bottomPanelTab === "history" ? "active" : ""}`}
                   onClick={() => {
                     setBottomPanelTab("history");
@@ -2128,10 +2886,12 @@ export default function EditorPage() {
 
               <div className="ide-bottom-panel-actions">
                 <button
+                  type="button"
                   className="ide-icon-btn"
                   onClick={() => {
                     if (executionOutput.stdout) {
                       navigator.clipboard.writeText(executionOutput.stdout);
+                      showToast("Output copied");
                     }
                   }}
                   title="Copy Output"
@@ -2139,6 +2899,7 @@ export default function EditorPage() {
                   <Copy size={13} />
                 </button>
                 <button
+                  type="button"
                   className="ide-icon-btn"
                   onClick={() =>
                     setExecutionOutput({
@@ -2155,22 +2916,36 @@ export default function EditorPage() {
                   <Trash2 size={13} />
                 </button>
                 <button
+                  type="button"
                   className="ide-icon-btn"
                   onClick={() => setIsBottomPanelCollapsed(!isBottomPanelCollapsed)}
-                  title={isBottomPanelCollapsed ? "Expand Panel" : "Collapse Panel"}
+                  title={isBottomPanelCollapsed ? "Expand Panel (Ctrl+`)" : "Collapse Panel (Ctrl+`)"}
                 >
-                  {isBottomPanelCollapsed ? <ChevronDown size={14} /> : <X size={14} />}
+                  {isBottomPanelCollapsed ? <ChevronRight size={14} style={{ transform: "rotate(-90deg)" }} /> : <X size={14} />}
                 </button>
               </div>
             </div>
 
             {!isBottomPanelCollapsed && (
               <div className="ide-bottom-panel-body">
+                {/* Tab 1: Terminal Console Foundation (Phase 8.6) */}
+                {bottomPanelTab === "terminal" && (
+                  <TerminalConsole
+                    activeFile={activeFile}
+                    files={files}
+                    projectName={roomId ? `Room ${roomId}` : projectData?.name || "Workspace"}
+                    userName={user?.name || "developer"}
+                    onRunCode={handleRunCode}
+                    isExecuting={isExecuting}
+                  />
+                )}
+
+                {/* Tab 2: Code Execution Output */}
                 {bottomPanelTab === "output" && (
                   <div>
                     {isExecuting && (
                       <div style={{ color: "#38bdf8", marginBottom: 8 }}>
-                        ⚡ Executing program on secure runner...
+                        ⚡ Executing program on Judge0 isolated runner...
                       </div>
                     )}
                     {executionOutput.stdout && (
@@ -2183,7 +2958,7 @@ export default function EditorPage() {
                       <div className="ide-output-compile">{executionOutput.compileOutput}</div>
                     )}
                     {!executionOutput.stdout && !executionOutput.stderr && !executionOutput.compileOutput && !isExecuting && (
-                      <div style={{ color: "#64748b" }}>Click "Run Code" to compile and execute program.</div>
+                      <div style={{ color: "#64748b" }}>Click "Run" or type 'run' in Terminal to compile and execute program.</div>
                     )}
 
                     {executionOutput.time !== null && (
@@ -2196,6 +2971,7 @@ export default function EditorPage() {
                   </div>
                 )}
 
+                {/* Tab 3: Stdin */}
                 {bottomPanelTab === "stdin" && (
                   <textarea
                     className="ide-stdin-textarea"
@@ -2205,6 +2981,7 @@ export default function EditorPage() {
                   />
                 )}
 
+                {/* Tab 4: Execution History */}
                 {bottomPanelTab === "history" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {executionHistory.map((run) => (
@@ -2238,6 +3015,32 @@ export default function EditorPage() {
           </section>
         </main>
       </div>
+
+      {/* Command Palette Modal (Phase 8.7) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        commands={paletteCommands}
+      />
+
+      {/* Quick Open File Modal (Phase 8.7) */}
+      <QuickOpen
+        isOpen={isQuickOpenOpen}
+        onClose={() => setIsQuickOpenOpen(false)}
+        files={files}
+        onSelectFile={openFile}
+      />
+
+      {/* Confirm Action Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        confirmVariant={confirmModal.confirmVariant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

@@ -95,6 +95,43 @@ function detectLanguageFromPath(path) {
   }
 }
 
+function escapeRegex(string) {
+  return typeof string === "string" ? string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "";
+}
+
+function sanitizeFolderPath(rawPath, fallbackName) {
+  let p = typeof rawPath === "string" ? rawPath.trim() : "";
+  if (!p && fallbackName) {
+    p = `/${fallbackName.trim()}`;
+  }
+  if (!p.startsWith("/")) {
+    p = `/${p}`;
+  }
+  p = p.replace(/\\/g, "/").replace(/\/+/g, "/");
+
+  const segments = p.split("/").filter(Boolean);
+  for (const seg of segments) {
+    if (seg === "..") {
+      const err = new Error("Invalid folder path. Path traversal is not allowed.");
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  // Strip trailing slash unless root
+  if (p.length > 1 && p.endsWith("/")) {
+    p = p.slice(0, -1);
+  }
+
+  if (p === "/") {
+    const err = new Error("Invalid folder path. Root directory cannot be targeted.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return p;
+}
+
 function sanitizePath(rawPath, fallbackName) {
   let p = typeof rawPath === "string" ? rawPath.trim() : "";
   if (!p && fallbackName) {
@@ -682,6 +719,342 @@ class ProjectService {
       message: "File deleted successfully.",
     };
   }
+
+  /**
+   * Creates a new folder (persisted via empty folder placeholder).
+   *
+   * @param {string} userId - Authenticated user ID.
+   * @param {string} projectId - Project ID.
+   * @param {Object} folderData
+   * @param {string} [folderData.path] - Full folder path (e.g. /src/components).
+   * @param {string} [folderData.name] - Folder name if parentPath is provided.
+   * @param {string} [folderData.parentPath] - Parent folder path.
+   * @returns {Promise<Object>} Created folder info.
+   */
+  async createFolder(userId, projectId, folderData = {}) {
+    const project = await this.verifyProjectOwnership(userId, projectId);
+
+    let rawPath = folderData.path;
+    if (!rawPath && folderData.name) {
+      const parent = folderData.parentPath ? folderData.parentPath.trim() : "";
+      rawPath = `${parent}/${folderData.name.trim()}`;
+    }
+
+    const folderPath = sanitizeFolderPath(rawPath);
+    const folderName = folderPath.slice(folderPath.lastIndexOf("/") + 1);
+
+    if (folderName.includes("/") || folderName.includes("\\") || folderName.includes("..")) {
+      const err = new Error("Folder name contains invalid characters.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const keepPath = `${folderPath}/.cocode-keep`;
+    const existingKeep = (project.files || []).find((f) => f.path === keepPath);
+    const existingChildren = (project.files || []).some((f) => f.path.startsWith(`${folderPath}/`));
+
+    if (existingKeep || existingChildren) {
+      return {
+        success: true,
+        message: "Folder already exists.",
+        folder: {
+          path: folderPath,
+          name: folderName,
+        },
+      };
+    }
+
+    await this.prisma.projectFile.create({
+      data: {
+        projectId,
+        name: ".cocode-keep",
+        path: keepPath,
+        language: "text",
+        content: "",
+      },
+    });
+
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { updatedAt: new Date() },
+    });
+
+    return {
+      success: true,
+      folder: {
+        path: folderPath,
+        name: folderName,
+      },
+    };
+  }
+
+  /**
+   * Renames a folder and moves all nested files recursively.
+   *
+   * @param {string} userId - Authenticated user ID.
+   * @param {string} projectId - Project ID.
+   * @param {Object} data
+   * @param {string} data.oldPath - Existing folder path.
+   * @param {string} data.newPath - Desired new folder path.
+   * @returns {Promise<Object>} Result with count of updated files.
+   */
+  async renameFolder(userId, projectId, data = {}) {
+    const project = await this.verifyProjectOwnership(userId, projectId);
+
+    const oldPath = sanitizeFolderPath(data.oldPath);
+    const newPath = sanitizeFolderPath(data.newPath);
+
+    if (oldPath === newPath) {
+      return {
+        success: true,
+        message: "Folder path unchanged.",
+        oldPath,
+        newPath,
+        count: 0,
+      };
+    }
+
+    const allFiles = project.files || [];
+    const filesToUpdate = allFiles.filter(
+      (f) => f.path === oldPath || f.path.startsWith(`${oldPath}/`)
+    );
+
+    if (filesToUpdate.length === 0) {
+      const err = new Error("Folder not found in project.");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // Check collision with other existing files
+    for (const f of filesToUpdate) {
+      let candidatePath;
+      if (f.path === oldPath) {
+        candidatePath = newPath;
+      } else {
+        candidatePath = `${newPath}/${f.path.slice(oldPath.length + 1)}`;
+      }
+      const collision = allFiles.find(
+        (existing) => !filesToUpdate.some((u) => u.id === existing.id) && existing.path === candidatePath
+      );
+      if (collision) {
+        const err = new Error("A file or folder with the destination path already exists.");
+        err.statusCode = 409;
+        throw err;
+      }
+    }
+
+    // Update each affected file
+    for (const f of filesToUpdate) {
+      let updatedPath;
+      if (f.path === oldPath) {
+        updatedPath = newPath;
+      } else {
+        updatedPath = `${newPath}/${f.path.slice(oldPath.length + 1)}`;
+      }
+      const updatedName = updatedPath.slice(updatedPath.lastIndexOf("/") + 1);
+
+      await this.prisma.projectFile.update({
+        where: { id: f.id },
+        data: {
+          path: updatedPath,
+          name: updatedName,
+        },
+      });
+    }
+
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { updatedAt: new Date() },
+    });
+
+    return {
+      success: true,
+      message: "Folder renamed successfully.",
+      oldPath,
+      newPath,
+      count: filesToUpdate.length,
+    };
+  }
+
+  /**
+   * Deletes a folder and all nested files recursively.
+   *
+   * @param {string} userId - Authenticated user ID.
+   * @param {string} projectId - Project ID.
+   * @param {string} folderPathRaw - Folder path to delete.
+   * @returns {Promise<Object>} Result with count of deleted files.
+   */
+  async deleteFolder(userId, projectId, folderPathRaw) {
+    const project = await this.verifyProjectOwnership(userId, projectId);
+    const folderPath = sanitizeFolderPath(folderPathRaw);
+
+    const allFiles = project.files || [];
+    const filesToDelete = allFiles.filter(
+      (f) => f.path === folderPath || f.path.startsWith(`${folderPath}/`)
+    );
+
+    for (const f of filesToDelete) {
+      await this.prisma.projectFile.delete({
+        where: { id: f.id },
+      });
+    }
+
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { updatedAt: new Date() },
+    });
+
+    return {
+      success: true,
+      message: "Folder and contents deleted successfully.",
+      count: filesToDelete.length,
+    };
+  }
+
+  /**
+   * Searches text across all supported files in a project.
+   *
+   * @param {string} userId - Authenticated user ID.
+   * @param {string} projectId - Project ID.
+   * @param {string} query - Search term.
+   * @param {Object} [options]
+   * @param {boolean} [options.matchCase=false]
+   * @param {boolean} [options.wholeWord=false]
+   * @returns {Promise<Object>} Search matches.
+   */
+  async searchProjectFiles(userId, projectId, query = "", options = {}) {
+    const project = await this.verifyProjectOwnership(userId, projectId);
+    const q = typeof query === "string" ? query.trim() : "";
+
+    if (!q) {
+      return {
+        success: true,
+        query: "",
+        totalMatches: 0,
+        matches: [],
+      };
+    }
+
+    const matchCase = Boolean(options.matchCase);
+    const wholeWord = Boolean(options.wholeWord);
+    const flags = matchCase ? "g" : "gi";
+    const pattern = wholeWord ? `\\b${escapeRegex(q)}\\b` : escapeRegex(q);
+    const regex = new RegExp(pattern, flags);
+
+    const matches = [];
+    const allFiles = project.files || [];
+
+    for (const file of allFiles) {
+      if (file.name === ".cocode-keep") continue;
+      const content = file.content || "";
+      const lines = content.split("\n");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        regex.lastIndex = 0;
+        let m;
+        while ((m = regex.exec(line)) !== null) {
+          matches.push({
+            fileId: file.id,
+            fileName: file.name,
+            filePath: file.path,
+            language: file.language,
+            lineNumber: i + 1,
+            lineContent: line.trim(),
+            matchStart: m.index,
+            matchEnd: m.index + m[0].length,
+          });
+          if (!regex.global) break;
+        }
+      }
+    }
+
+    return {
+      success: true,
+      query: q,
+      totalMatches: matches.length,
+      matches,
+    };
+  }
+
+  /**
+   * Saves multiple modified files in one batch using a transaction.
+   * Validates all files belong to the project, validates sizes, and rolls back on failure.
+   *
+   * @param {string} userId - Authenticated user ID.
+   * @param {string} projectId - Project ID.
+   * @param {Array<Object>} filesToSave - Array of { id, content, language }.
+   * @returns {Promise<Object>} Result with count of saved files.
+   */
+  async saveAllFiles(userId, projectId, filesToSave = []) {
+    const project = await this.verifyProjectOwnership(userId, projectId);
+
+    if (!Array.isArray(filesToSave) || filesToSave.length === 0) {
+      return {
+        success: true,
+        message: "No files provided to save.",
+        count: 0,
+      };
+    }
+
+    const allFilesMap = new Map((project.files || []).map((f) => [f.id, f]));
+
+    // Strictly validate ALL items upfront before starting any database writes
+    for (const item of filesToSave) {
+      if (!item || typeof item.id !== "string" || !item.id.trim()) {
+        const err = new Error("Invalid file entry in batch: missing or invalid file id.");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (!allFilesMap.has(item.id)) {
+        const err = new Error(`File ID "${item.id}" does not exist in this project.`);
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const content = typeof item.content === "string" ? item.content : "";
+      if (Buffer.byteLength(content, "utf8") > MAX_FILE_SIZE_BYTES) {
+        const f = allFilesMap.get(item.id);
+        const err = new Error(`File ${f?.name || item.id} exceeds 1MB limit.`);
+        err.statusCode = 413;
+        throw err;
+      }
+    }
+
+    // Execute batch update inside transaction
+    const executeBatch = async (tx) => {
+      for (const item of filesToSave) {
+        const content = typeof item.content === "string" ? item.content : "";
+        const updateData = { content };
+        if (item.language) {
+          updateData.language = normalizeLanguage(item.language);
+        }
+
+        await tx.projectFile.update({
+          where: { id: item.id },
+          data: updateData,
+        });
+      }
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { updatedAt: new Date() },
+      });
+    };
+
+    if (typeof this.prisma.$transaction === "function") {
+      await this.prisma.$transaction(executeBatch);
+    } else {
+      await executeBatch(this.prisma);
+    }
+
+    return {
+      success: true,
+      message: "Files saved successfully.",
+      count: filesToSave.length,
+    };
+  }
 }
 
 module.exports = {
@@ -689,4 +1062,6 @@ module.exports = {
   normalizeLanguage,
   detectLanguageFromPath,
   sanitizePath,
+  sanitizeFolderPath,
+  escapeRegex,
 };

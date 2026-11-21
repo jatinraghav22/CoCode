@@ -52,6 +52,13 @@ function createProjectRouter(options) {
   router.put("/:id/files/:fileId", requireAuth, projectController.updateProjectFile);
   router.delete("/:id/files/:fileId", requireAuth, projectController.deleteProjectFile);
 
+  // Phase 8: Folders, Search, and Batch Save
+  router.post("/:id/folders", requireAuth, projectController.createFolder);
+  router.put("/:id/folders", requireAuth, projectController.renameFolder);
+  router.delete("/:id/folders", requireAuth, projectController.deleteFolder);
+  router.get("/:id/search", requireAuth, projectController.searchProject);
+  router.put("/:id/save-all", requireAuth, projectController.saveAllFiles);
+
   return router;
 }
 

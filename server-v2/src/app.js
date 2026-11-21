@@ -43,8 +43,8 @@ function createApp(config, dependencies = {}) {
     })
   );
 
-  app.use(express.json({ limit: "1mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   app.get("/api/health", (req, res) => {
     res.status(200).json({
@@ -140,6 +140,14 @@ function createApp(config, dependencies = {}) {
     if (err.message === "Origin is not allowed by CORS.") {
       return res.status(403).json({
         success: false,
+        message: err.message,
+      });
+    }
+
+    if (err.status || err.statusCode) {
+      return res.status(err.status || err.statusCode).json({
+        success: false,
+        error: err.message,
         message: err.message,
       });
     }
