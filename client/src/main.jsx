@@ -17,6 +17,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 // Route-level code splitting to optimize bundle size and speed up page load
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
+const Projects = lazy(() => import("./pages/Projects.jsx"));
 const EditorPage = lazy(() => import("./pages/EditorPage.jsx"));
 const Compiler = lazy(() => import("./pages/Compiler.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
@@ -93,7 +94,7 @@ createRoot(document.getElementById("root")).render(
                 path="/projects"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <Projects />
                   </ProtectedRoute>
                 }
               />

@@ -18,6 +18,7 @@ import {
   FolderPlus,
   RefreshCw,
   AlertCircle,
+  Activity,
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { useAuth } from "../AuthContext.jsx";
@@ -433,14 +434,19 @@ export default function Dashboard() {
             <section className="dashboard-card-column glass-panel">
               <div className="card-header-bar">
                 <h2 className="card-header-heading">Recent Projects</h2>
-                <button
-                  type="button"
-                  className="card-header-link"
-                  onClick={() => setNewProjectModalOpen(true)}
-                >
-                  <Plus size={14} />
-                  <span>New</span>
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <Link to="/projects" className="card-header-link" style={{ fontSize: "0.85rem" }}>
+                    View All
+                  </Link>
+                  <button
+                    type="button"
+                    className="card-header-link"
+                    onClick={() => setNewProjectModalOpen(true)}
+                  >
+                    <Plus size={14} />
+                    <span>New</span>
+                  </button>
+                </div>
               </div>
 
               <div className="projects-list-wrap">
@@ -600,6 +606,107 @@ export default function Dashboard() {
               </div>
             </section>
           </div>
+
+          {/* =================================================================
+              4. RECENT CODING ACTIVITY SECTION
+              ================================================================= */}
+          <section className="dashboard-activity-section glass-panel" style={{ marginTop: "2rem" }}>
+            <div className="card-header-bar">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Activity size={18} className="text-emerald" />
+                <h2 className="card-header-heading">Recent Coding Activity</h2>
+              </div>
+              <span className="activity-count-badge" style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+                {(dashboardData?.recentActivities || []).length} recent events
+              </span>
+            </div>
+
+            <div className="activity-list-wrap">
+              {loading ? (
+                <div className="dashboard-skeleton-list">
+                  <div className="skeleton-project-row" />
+                  <div className="skeleton-project-row" />
+                </div>
+              ) : (dashboardData?.recentActivities || []).length === 0 ? (
+                <div className="empty-activity-state" style={{ padding: "2.5rem 1rem", textAlign: "center", color: "#94a3b8" }}>
+                  <Clock size={32} className="text-muted-cyan" style={{ margin: "0 auto 0.75rem", display: "block", opacity: 0.5 }} />
+                  <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                    No coding activity recorded yet. Run code in the compiler or edit project files to see your activity stream!
+                  </p>
+                </div>
+              ) : (
+                (dashboardData?.recentActivities || []).map((act) => (
+                  <div
+                    key={act.id}
+                    className="activity-row-item"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0.85rem 1rem",
+                      borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                      gap: "1rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                      <span
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          backgroundColor: act.status === "success" ? "#10b981" : "#f43f5e",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <strong style={{ fontSize: "0.9rem", color: "#f8fafc" }}>
+                            {act.eventType === "execution_success" && `Executed code in ${act.language}`}
+                            {act.eventType === "execution_failed" && `Execution failed in ${act.language}`}
+                            {act.eventType === "project_created" && "Created new project"}
+                            {act.eventType === "project_updated" && "Updated project settings"}
+                            {act.eventType === "file_created" && "Created project file"}
+                            {act.eventType === "file_updated" && "Saved project file"}
+                            {!["execution_success", "execution_failed", "project_created", "project_updated", "file_created", "file_updated"].includes(act.eventType) && act.eventType}
+                          </strong>
+                          {act.projectName && (
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "#818cf8",
+                                background: "rgba(99, 102, 241, 0.15)",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              {act.projectName}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                          {new Date(act.createdAt).toLocaleString()}
+                          {act.durationSeconds ? ` • ${act.durationSeconds}s` : ""}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        fontWeight: 600,
+                        textTransform: "capitalize",
+                        color: act.status === "success" ? "#34d399" : "#f87171",
+                        background: act.status === "success" ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                      }}
+                    >
+                      {act.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
         </div>
       </main>
 

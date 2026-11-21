@@ -95,6 +95,12 @@ export default function EditorPage() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
+  // Persistent Project state (Phase 7)
+  const projectId = searchParams.get("projectId");
+  const [projectData, setProjectData] = useState(null);
+  const [projectLoading, setProjectLoading] = useState(() => Boolean(projectId));
+  const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "unsaved" | "error"
+
   // Connection and Room collaboration state
   const [connectionStatus, setConnectionStatus] = useState(() => (roomId ? "connecting" : "disconnected"));
   const [roomError, setRoomError] = useState(null);
@@ -217,6 +223,56 @@ export default function EditorPage() {
       localStorage.setItem(projectStorageKey, JSON.stringify(files));
     } catch {}
   }, [files, projectStorageKey]);
+
+  // Load persistent project from database when projectId is in URL
+  useEffect(() => {
+    if (!projectId || !token) return;
+
+    let active = true;
+    setProjectLoading(true);
+
+    async function loadProject() {
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to load project (${res.status})`);
+        }
+
+        const data = await res.json();
+        if (active && data.project) {
+          setProjectData(data.project);
+          if (data.project.files && data.project.files.length > 0) {
+            const serverFiles = data.project.files.map((f) => ({
+              id: f.id,
+              name: f.name,
+              path: f.path,
+              language: f.language,
+              content: f.content || "",
+              isFolder: false,
+            }));
+            setFiles(serverFiles);
+            setOpenTabIds([serverFiles[0].id]);
+            setActiveFileId(serverFiles[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Project load error:", err);
+      } finally {
+        if (active) setProjectLoading(false);
+      }
+    }
+
+    loadProject();
+
+    return () => {
+      active = false;
+    };
+  }, [projectId, token]);
 
   // Initialize Socket.IO connection for real-time room collaboration
   useEffect(() => {
@@ -668,13 +724,45 @@ export default function EditorPage() {
   }
 
   // Save current file revision
-  function saveCurrentFile() {
+  async function saveCurrentFile() {
     if (!activeFile) return;
-    setDirtyFiles((prev) => {
-      const next = { ...prev };
-      delete next[activeFile.id];
-      return next;
-    });
+
+    if (projectId && token && !activeFile.isFolder) {
+      setSaveStatus("saving");
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${activeFile.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            content: activeFile.content || "",
+            language: activeFile.language || "javascript",
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to save file to server.");
+        }
+
+        setSaveStatus("saved");
+        setDirtyFiles((prev) => {
+          const next = { ...prev };
+          delete next[activeFile.id];
+          return next;
+        });
+      } catch (err) {
+        console.error("Save file error:", err);
+        setSaveStatus("error");
+      }
+    } else {
+      setDirtyFiles((prev) => {
+        const next = { ...prev };
+        delete next[activeFile.id];
+        return next;
+      });
+    }
 
     const newRev = {
       id: `rev-${Date.now()}`,
@@ -716,7 +804,7 @@ export default function EditorPage() {
   }
 
   // Create new file or folder
-  function handleCreateItem() {
+  async function handleCreateItem() {
     if (!newItemName.trim()) {
       setNewFileInput(null);
       return;
@@ -734,28 +822,88 @@ export default function EditorPage() {
     else if (cleanName.endsWith(".css")) language = "css";
     else if (cleanName.endsWith(".json")) language = "json";
 
-    const newItem = {
-      id: `f-${Date.now()}`,
-      name: cleanName,
-      path,
-      isFolder: Boolean(newFileInput?.isFolder),
-      language,
-      content: newFileInput?.isFolder ? undefined : "",
-    };
+    if (projectId && token && !newFileInput?.isFolder) {
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/files`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: cleanName,
+            path,
+            language,
+            content: "",
+          }),
+        });
 
-    setFiles((prev) => [...prev, newItem]);
-    if (!newItem.isFolder) {
-      setOpenTabIds((prev) => [...prev, newItem.id]);
-      setActiveFileId(newItem.id);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || errData.message || "Failed to create file.");
+        }
+
+        const data = await res.json();
+        const serverFile = data.file;
+
+        const newItem = {
+          id: serverFile.id,
+          name: serverFile.name,
+          path: serverFile.path,
+          isFolder: false,
+          language: serverFile.language,
+          content: serverFile.content || "",
+        };
+
+        setFiles((prev) => [...prev, newItem]);
+        setOpenTabIds((prev) => [...prev, newItem.id]);
+        setActiveFileId(newItem.id);
+      } catch (err) {
+        alert(err.message || "Failed to create file.");
+      }
+    } else {
+      const newItem = {
+        id: `f-${Date.now()}`,
+        name: cleanName,
+        path,
+        isFolder: Boolean(newFileInput?.isFolder),
+        language,
+        content: newFileInput?.isFolder ? undefined : "",
+      };
+
+      setFiles((prev) => [...prev, newItem]);
+      if (!newItem.isFolder) {
+        setOpenTabIds((prev) => [...prev, newItem.id]);
+        setActiveFileId(newItem.id);
+      }
     }
+
     setNewFileInput(null);
     setNewItemName("");
   }
 
   // Delete file or folder
-  function handleDeleteItem(item, e) {
+  async function handleDeleteItem(item, e) {
     e.stopPropagation();
     if (!window.confirm(`Are you sure you want to delete "${item.name}"?`)) return;
+
+    if (projectId && token && !item.isFolder) {
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/files/${item.id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to delete file from project.");
+        }
+      } catch (err) {
+        alert(err.message || "Failed to delete file.");
+        return;
+      }
+    }
 
     setFiles((prev) =>
       prev.filter((f) => f.id !== item.id && !f.path.startsWith(`${item.path}/`))
@@ -862,6 +1010,7 @@ export default function EditorPage() {
           sourceCode: activeFile.content || "",
           language: activeFile.language || "javascript",
           stdin: stdinValue,
+          projectId: projectId || undefined,
         }),
       });
 
@@ -1089,6 +1238,11 @@ export default function EditorPage() {
         </div>
 
         <div className="ide-topbar-center">
+          {projectData && (
+            <span style={{ fontSize: "12px", color: "#818cf8", fontWeight: 600, marginRight: "8px" }}>
+              {projectData.name} /
+            </span>
+          )}
           {activeFile && (
             <div className="ide-project-title-badge">
               {renderLanguageBadge(activeFile.language)}
@@ -1110,8 +1264,22 @@ export default function EditorPage() {
             </button>
           )}
 
-          <button className="ide-btn-header-secondary" onClick={saveCurrentFile} title="Save File (Ctrl+S)">
-            <span>{dirtyFiles[activeFileId] ? "● Save" : "Saved"}</span>
+          <button
+            className="ide-btn-header-secondary"
+            onClick={saveCurrentFile}
+            title="Save File (Ctrl+S)"
+            style={{
+              borderColor: dirtyFiles[activeFileId] ? "#f59e0b" : undefined,
+              color: dirtyFiles[activeFileId] ? "#fbbf24" : undefined,
+            }}
+          >
+            <span>
+              {saveStatus === "saving"
+                ? "Saving..."
+                : dirtyFiles[activeFileId]
+                ? "● Save"
+                : "Saved"}
+            </span>
           </button>
 
           <button

@@ -21,22 +21,28 @@ const testConfig = {
  * Creates an in-memory mock Prisma client supporting users, collaboration rooms,
  * room participants, and room documents.
  */
-function createMockPrisma({ users = [], rooms = [], participants = [], documents = [] } = {}) {
+function createMockPrisma({ users = [], rooms = [], participants = [], documents = [], projects = [], activities = [] } = {}) {
   const userMap = new Map();
   const roomMap = new Map();
   const participantMap = new Map();
   const documentMap = new Map();
+  const projectMap = new Map();
+  const activityMap = new Map();
 
   for (const u of users) userMap.set(u.id, { ...u });
   for (const r of rooms) roomMap.set(r.id, { ...r, code: r.code.toUpperCase() });
   for (const p of participants) participantMap.set(p.id, { ...p });
   for (const d of documents) documentMap.set(d.id, { ...d });
+  for (const pr of projects) projectMap.set(pr.id, { ...pr, files: pr.files || [] });
+  for (const a of activities) activityMap.set(a.id, { ...a });
 
   return {
     _users: userMap,
     _rooms: roomMap,
     _participants: participantMap,
     _documents: documentMap,
+    _projects: projectMap,
+    _activities: activityMap,
 
     user: {
       async findUnique({ where, select }) {
@@ -126,6 +132,54 @@ function createMockPrisma({ users = [], rooms = [], participants = [], documents
           matchedRooms.push(roomEntry);
         }
         return matchedRooms;
+      },
+    },
+
+    project: {
+      async count({ where }) {
+        let count = 0;
+        for (const pr of projectMap.values()) {
+          if (where.userId && pr.userId !== where.userId) continue;
+          count++;
+        }
+        return count;
+      },
+      async findMany({ where, orderBy, take = 5, select, include }) {
+        const results = [];
+        for (const pr of projectMap.values()) {
+          if (where?.userId && pr.userId !== where.userId) continue;
+          const item = { ...pr };
+          if (include?.files) {
+            item.files = pr.files || [];
+          }
+          results.push(item);
+        }
+        return results.slice(0, take);
+      },
+    },
+
+    codingActivity: {
+      async findMany({ where, orderBy, take = 5, select, include }) {
+        const results = [];
+        for (const act of activityMap.values()) {
+          if (where?.userId && act.userId !== where.userId) continue;
+          if (where?.createdAt?.gte && new Date(act.createdAt) < new Date(where.createdAt.gte)) continue;
+          if (select) {
+            const proj = {};
+            for (const k of Object.keys(select)) {
+              if (select[k]) proj[k] = act[k];
+            }
+            results.push(proj);
+          } else {
+            const item = { ...act };
+            if (include?.project && act.projectId) {
+              const p = projectMap.get(act.projectId);
+              item.project = p ? { id: p.id, name: p.name } : null;
+            }
+            results.push(item);
+          }
+        }
+        return results.slice(0, take);
       },
     },
   };
@@ -349,4 +403,121 @@ test("Dashboard - frontend uses the correct API endpoint (/api/dashboard)", asyn
     /fetch\(`\$\{API_BASE\}\/api\/dashboard`/,
     "Dashboard.jsx calls /api/dashboard endpoint"
   );
+});
+
+test("Dashboard - returns real persisted project count and recent projects", async (t) => {
+  const user = { id: "usr_dev_1", name: "Dev One", email: "dev1@example.com" };
+  const proj1 = {
+    id: "proj_1",
+    userId: user.id,
+    name: "Web Scraper",
+    description: "Python scraping toolkit",
+    defaultLanguage: "python",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    files: [{ id: "f1", name: "scraper.py", language: "python" }],
+  };
+  const proj2 = {
+    id: "proj_2",
+    userId: user.id,
+    name: "React Dashboard",
+    description: "Frontend analytics",
+    defaultLanguage: "javascript",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    files: [{ id: "f2", name: "App.jsx", language: "javascript" }],
+  };
+
+  const prisma = createMockPrisma({
+    users: [user],
+    projects: [proj1, proj2],
+  });
+
+  const { baseUrl, close } = await createTestServer(prisma);
+  t.after(close);
+
+  const token = signAccessToken(user, TEST_SECRET);
+  const res = await fetch(`${baseUrl}/api/dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(body.stats.totalProjects, 2);
+  assert.equal(body.recentProjects.length, 2);
+  assert.equal(body.recentProjects[0].name, "Web Scraper");
+  assert.equal(body.recentProjects[0].fileCount, 1);
+});
+
+test("Dashboard - returns real today's activity minutes and recent activities", async (t) => {
+  const user = { id: "usr_dev_2", name: "Dev Two", email: "dev2@example.com" };
+  const now = new Date();
+  const act1 = {
+    id: "act_1",
+    userId: user.id,
+    language: "python",
+    eventType: "execution_success",
+    status: "success",
+    durationSeconds: 120, // 2 minutes
+    createdAt: now,
+  };
+  const act2 = {
+    id: "act_2",
+    userId: user.id,
+    language: "javascript",
+    eventType: "execution_success",
+    status: "success",
+    durationSeconds: 60, // 1 minute
+    createdAt: now,
+  };
+
+  const prisma = createMockPrisma({
+    users: [user],
+    activities: [act1, act2],
+  });
+
+  const { baseUrl, close } = await createTestServer(prisma);
+  t.after(close);
+
+  const token = signAccessToken(user, TEST_SECRET);
+  const res = await fetch(`${baseUrl}/api/dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(body.stats.todayActivityMinutes, 3); // 120s + 60s = 180s = 3 mins
+  assert.equal(body.recentActivities.length, 2);
+});
+
+test("Dashboard - user isolation on projects and activities", async (t) => {
+  const alice = { id: "usr_alice_d", name: "Alice", email: "alice.d@example.com" };
+  const bob = { id: "usr_bob_d", name: "Bob", email: "bob.d@example.com" };
+
+  const projAlice = { id: "p_alice", userId: alice.id, name: "Alice's Project", defaultLanguage: "javascript", updatedAt: new Date() };
+  const projBob = { id: "p_bob", userId: bob.id, name: "Bob's Project", defaultLanguage: "python", updatedAt: new Date() };
+
+  const actAlice = { id: "act_alice", userId: alice.id, language: "javascript", eventType: "file_created", status: "success", createdAt: new Date() };
+  const actBob = { id: "act_bob", userId: bob.id, language: "python", eventType: "file_created", status: "success", createdAt: new Date() };
+
+  const prisma = createMockPrisma({
+    users: [alice, bob],
+    projects: [projAlice, projBob],
+    activities: [actAlice, actBob],
+  });
+
+  const { baseUrl, close } = await createTestServer(prisma);
+  t.after(close);
+
+  const aliceToken = signAccessToken(alice, TEST_SECRET);
+  const res = await fetch(`${baseUrl}/api/dashboard`, {
+    headers: { Authorization: `Bearer ${aliceToken}` },
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(body.stats.totalProjects, 1);
+  assert.equal(body.recentProjects[0].name, "Alice's Project");
+  assert.equal(body.recentActivities.length, 1);
+  assert.equal(body.recentActivities[0].id, "act_alice");
 });

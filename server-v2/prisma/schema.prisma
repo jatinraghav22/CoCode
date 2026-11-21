@@ -19,6 +19,10 @@ model User {
   ownedRooms   CollaborationRoom[]  @relation("RoomOwner")
   roomMemberships RoomParticipant[] @relation("ParticipantUser")
 
+  // Phase 7: Projects & Coding Activity relations
+  projects     Project[]        @relation("UserProjects")
+  activities   CodingActivity[] @relation("UserActivities")
+
   @@map("users")
 }
 
@@ -86,4 +90,61 @@ model RoomDocument {
   @@unique([roomId, fileId])
   @@index([roomId])
   @@map("room_documents")
+}
+
+// Phase 7: Persistent Project Management
+model Project {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  description     String?  @db.Text
+  defaultLanguage String   @default("javascript")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User           @relation("UserProjects", fields: [userId], references: [id], onDelete: Cascade)
+  files           ProjectFile[]  @relation("ProjectFiles")
+  activities      CodingActivity[] @relation("ProjectActivities")
+
+  @@index([userId])
+  @@map("projects")
+}
+
+// Phase 7: Project File Management
+model ProjectFile {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  path      String
+  language  String   @default("javascript")
+  content   String   @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation("ProjectFiles", fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@map("project_files")
+}
+
+// Phase 7: Coding Activity Tracking
+model CodingActivity {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  language        String
+  eventType       String
+  status          String
+  durationSeconds Int?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation("UserActivities", fields: [userId], references: [id], onDelete: Cascade)
+  project         Project? @relation("ProjectActivities", fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([userId, createdAt])
+  @@index([userId, eventType])
+  @@map("coding_activities")
 }

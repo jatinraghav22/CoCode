@@ -5,12 +5,15 @@ const { validateRunCodeInput } = require("./compiler.validation");
 class CompilerController {
   /**
    * @param {Object} compilerService
+   * @param {Object} [options]
+   * @param {Object} [options.activityService]
    */
-  constructor(compilerService) {
+  constructor(compilerService, options = {}) {
     if (!compilerService) {
       throw new Error("CompilerController requires a compilerService instance.");
     }
     this.compilerService = compilerService;
+    this.activityService = options.activityService || null;
   }
 
   /**
@@ -51,6 +54,31 @@ class CompilerController {
 
       const result = await this.compilerService.runCode(validation.normalized);
 
+      // Track coding activity for authenticated user (genuine code execution event)
+      if (this.activityService && req.userId) {
+        const isSuccess =
+          result.status?.id === 3 ||
+          result.status?.description === "Accepted" ||
+          (!result.stderr && !result.compileOutput);
+        const status = isSuccess ? "success" : "failed";
+        const eventType = isSuccess ? "execution_success" : "execution_failed";
+        const duration =
+          result.time && !isNaN(parseFloat(result.time))
+            ? Math.round(parseFloat(result.time))
+            : null;
+
+        Promise.resolve(
+          this.activityService.trackActivity({
+            userId: req.userId,
+            projectId: req.body?.projectId || null,
+            language: result.language || (typeof validation.normalized.language === "string" ? validation.normalized.language : "javascript"),
+            eventType,
+            status,
+            durationSeconds: duration,
+          })
+        ).catch(() => {});
+      }
+
       // Return both Backend V2 standard envelope and top-level fields for client compatibility
       return res.status(200).json({
         success: true,
@@ -74,6 +102,19 @@ class CompilerController {
         memory: result.memory,
       });
     } catch (error) {
+      if (this.activityService && req.userId) {
+        Promise.resolve(
+          this.activityService.trackActivity({
+            userId: req.userId,
+            projectId: req.body?.projectId || null,
+            language: typeof req.body?.language === "string" ? req.body.language : "javascript",
+            eventType: "execution_failed",
+            status: "failed",
+            durationSeconds: null,
+          })
+        ).catch(() => {});
+      }
+
       // Never log user source code, stdin, or API tokens
       console.error("Compiler execution error:", error.name, (error.message || "").slice(0, 150));
 

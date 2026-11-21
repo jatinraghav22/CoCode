@@ -63,7 +63,9 @@ function createCompilerRouter(options = {}) {
       judge0Service,
     });
 
-  const compilerController = new CompilerController(compilerService);
+  const compilerController = new CompilerController(compilerService, {
+    activityService: options.activityService,
+  });
 
   router.get("/languages", requireAuth, compilerController.getLanguages);
   router.post("/run", requireAuth, compilerLimiter, compilerController.runCode);

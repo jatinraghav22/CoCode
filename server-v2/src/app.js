@@ -7,6 +7,10 @@ const { createUserRouter } = require("./routes/user.routes");
 const { createCompilerRouter } = require("./routes/compiler.routes");
 const { createRoomRouter } = require("./routes/room.routes");
 const { createDashboardRouter } = require("./routes/dashboard.routes");
+const { createProjectRouter } = require("./routes/project.routes");
+const { createActivityRouter } = require("./routes/activity.routes");
+const { ActivityService } = require("./modules/activity/activity.service");
+const { ProjectService } = require("./modules/projects/project.service");
 
 function createApp(config, dependencies = {}) {
   const app = express();
@@ -70,11 +74,15 @@ function createApp(config, dependencies = {}) {
 
   app.use("/api/users", userRouter);
 
+  const activityService =
+    dependencies.activityService || new ActivityService(prisma);
+
   const compilerRouter = createCompilerRouter({
     config: resolvedConfig,
     prisma,
     compilerService: dependencies.compilerService,
     judge0Service: dependencies.judge0Service,
+    activityService,
     authMiddleware: dependencies.authMiddleware,
   });
 
@@ -88,6 +96,25 @@ function createApp(config, dependencies = {}) {
   });
 
   app.use("/api/rooms", roomRouter);
+
+  const projectRouter = createProjectRouter({
+    config: resolvedConfig,
+    prisma,
+    projectService: dependencies.projectService,
+    activityService,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/projects", projectRouter);
+
+  const activityRouter = createActivityRouter({
+    config: resolvedConfig,
+    prisma,
+    activityService,
+    authMiddleware: dependencies.authMiddleware,
+  });
+
+  app.use("/api/activity", activityRouter);
 
   const dashboardRouter = createDashboardRouter({
     config: resolvedConfig,
