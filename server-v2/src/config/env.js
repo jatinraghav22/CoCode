@@ -23,6 +23,24 @@ function loadEnv() {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+  // Parse TRUST_PROXY configuration safely.
+  // By default, false (no proxy trusted).
+  // In production behind a reverse proxy (e.g., Render, AWS ALB, Cloudflare),
+  // set TRUST_PROXY=1 (or specific subnet string like 'loopback').
+  let trustProxy = false;
+  if (process.env.TRUST_PROXY !== undefined && process.env.TRUST_PROXY !== "") {
+    const rawVal = process.env.TRUST_PROXY.trim();
+    if (rawVal.toLowerCase() === "false" || rawVal === "0") {
+      trustProxy = false;
+    } else if (rawVal.toLowerCase() === "true") {
+      trustProxy = true;
+    } else if (/^\d+$/.test(rawVal)) {
+      trustProxy = parseInt(rawVal, 10);
+    } else {
+      trustProxy = rawVal;
+    }
+  }
+
   let jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     if (nodeEnv === "production") {
@@ -41,15 +59,26 @@ function loadEnv() {
 
   const judge0BaseUrl = (process.env.JUDGE0_BASE_URL || "https://ce.judge0.com").replace(/\/+$/, "");
   const judge0ApiKey = process.env.JUDGE0_API_KEY || process.env.JUDGE0_AUTH_TOKEN || null;
-  const judge0TimeoutMs = Number(process.env.JUDGE0_TIMEOUT_MS || 10000);
-  const judge0PollIntervalMs = Number(process.env.JUDGE0_POLL_INTERVAL_MS || 750);
-  const judge0MaxPollAttempts = Number(process.env.JUDGE0_MAX_POLL_ATTEMPTS || 15);
+
+  const rawTimeout = Number(process.env.JUDGE0_TIMEOUT_MS || 10000);
+  const judge0TimeoutMs = Number.isFinite(rawTimeout) && rawTimeout >= 1000 && rawTimeout <= 60000 ? rawTimeout : 10000;
+
+  const rawPollInterval = Number(process.env.JUDGE0_POLL_INTERVAL_MS || 750);
+  const judge0PollIntervalMs = Number.isFinite(rawPollInterval) && rawPollInterval >= 100 && rawPollInterval <= 5000 ? rawPollInterval : 750;
+
+  const rawMaxPoll = Number(process.env.JUDGE0_MAX_POLL_ATTEMPTS || 15);
+  const judge0MaxPollAttempts = Number.isFinite(rawMaxPoll) && rawMaxPoll >= 1 && rawMaxPoll <= 60 ? rawMaxPoll : 15;
+
+  const rawTotalTimeout = Number(process.env.JUDGE0_TOTAL_TIMEOUT_MS || 15000);
+  const judge0TotalTimeoutMs = Number.isFinite(rawTotalTimeout) && rawTotalTimeout >= 3000 && rawTotalTimeout <= 60000 ? rawTotalTimeout : 15000;
+
   const judge0UseBase64 = process.env.JUDGE0_USE_BASE64 !== "false";
 
   return Object.freeze({
     nodeEnv,
     port,
     clientOrigins,
+    trustProxy,
     jwtSecret,
     jwtExpiresIn,
     jwtIssuer,
@@ -59,6 +88,7 @@ function loadEnv() {
     judge0TimeoutMs,
     judge0PollIntervalMs,
     judge0MaxPollAttempts,
+    judge0TotalTimeoutMs,
     judge0UseBase64,
   });
 }

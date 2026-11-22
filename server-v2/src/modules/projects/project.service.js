@@ -1,6 +1,7 @@
 "use strict";
 
 const MAX_FILE_SIZE_BYTES = 1024 * 1024; // 1MB
+const MAX_BATCH_FILES = 50;
 
 const STARTER_TEMPLATES = {
   javascript: {
@@ -924,7 +925,7 @@ class ProjectService {
    */
   async searchProjectFiles(userId, projectId, query = "", options = {}) {
     const project = await this.verifyProjectOwnership(userId, projectId);
-    const q = typeof query === "string" ? query.trim() : "";
+    const q = (typeof query === "string" ? query.trim() : "").slice(0, 200);
 
     if (!q) {
       return {
@@ -945,11 +946,13 @@ class ProjectService {
     const allFiles = project.files || [];
 
     for (const file of allFiles) {
+      if (matches.length >= 1000) break;
       if (file.name === ".cocode-keep") continue;
       const content = file.content || "";
       const lines = content.split("\n");
 
       for (let i = 0; i < lines.length; i++) {
+        if (matches.length >= 1000) break;
         const line = lines[i];
         regex.lastIndex = 0;
         let m;
@@ -964,6 +967,7 @@ class ProjectService {
             matchStart: m.index,
             matchEnd: m.index + m[0].length,
           });
+          if (matches.length >= 1000) break;
           if (!regex.global) break;
         }
       }
@@ -995,6 +999,12 @@ class ProjectService {
         message: "No files provided to save.",
         count: 0,
       };
+    }
+
+    if (filesToSave.length > MAX_BATCH_FILES) {
+      const err = new Error(`Batch save exceeds maximum allowed limit of ${MAX_BATCH_FILES} files.`);
+      err.statusCode = 400;
+      throw err;
     }
 
     const allFilesMap = new Map((project.files || []).map((f) => [f.id, f]));

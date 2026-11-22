@@ -26,6 +26,11 @@ function createApp(config, dependencies = {}) {
   const prisma = dependencies.prisma || defaultPrisma;
 
   app.disable("x-powered-by");
+  if (resolvedConfig.trustProxy !== undefined && resolvedConfig.trustProxy !== false) {
+    app.set("trust proxy", resolvedConfig.trustProxy);
+  } else {
+    app.set("trust proxy", false);
+  }
 
   app.use(helmet());
 
@@ -43,9 +48,10 @@ function createApp(config, dependencies = {}) {
     })
   );
 
-  app.use(express.json({ limit: "10mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+  app.use(express.json({ limit: "5mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
+  // Liveness probe — fast check confirming server process is running
   app.get("/api/health", (req, res) => {
     res.status(200).json({
       success: true,
@@ -54,6 +60,65 @@ function createApp(config, dependencies = {}) {
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
     });
+  });
+
+  // Readiness probe — deep check confirming critical dependencies (TiDB database) are operational
+  app.get("/api/ready", async (req, res) => {
+    if (!prisma || typeof prisma.$queryRaw !== "function") {
+      return res.status(503).json({
+        success: false,
+        service: "cocode-backend-v2",
+        status: "not_ready",
+        checks: {
+          database: "unavailable",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    let timeoutHandle = null;
+    try {
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error("Database readiness probe timed out")),
+          4000
+        );
+      });
+
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1`,
+        timeoutPromise,
+      ]);
+
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+
+      return res.status(200).json({
+        success: true,
+        service: "cocode-backend-v2",
+        status: "ready",
+        checks: {
+          database: "healthy",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      return res.status(503).json({
+        success: false,
+        service: "cocode-backend-v2",
+        status: "not_ready",
+        checks: {
+          database: "unreachable",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   const authRouter = createAuthRouter({
@@ -140,22 +205,91 @@ function createApp(config, dependencies = {}) {
     if (err.message === "Origin is not allowed by CORS.") {
       return res.status(403).json({
         success: false,
+        error: "Forbidden by CORS policy.",
         message: err.message,
       });
     }
 
-    if (err.status || err.statusCode) {
-      return res.status(err.status || err.statusCode).json({
+    // Malformed JSON request body
+    if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+      return res.status(400).json({
+        success: false,
+        error: "Malformed JSON payload in request.",
+        message: "Malformed JSON payload in request.",
+      });
+    }
+
+    // Payload too large (body-parser limit exceeded)
+    if (err.type === "entity.too.large" || err.status === 413) {
+      return res.status(413).json({
+        success: false,
+        error: "Payload exceeds maximum allowed size.",
+        message: "Payload exceeds maximum allowed size.",
+      });
+    }
+
+    // Prisma: Unique constraint violation
+    if (err.code === "P2002") {
+      const target = Array.isArray(err.meta?.target) ? err.meta.target.join(", ") : "field";
+      return res.status(409).json({
+        success: false,
+        error: `A record with this ${target} already exists.`,
+        message: `A record with this ${target} already exists.`,
+      });
+    }
+
+    // Prisma: Record not found
+    if (err.code === "P2025") {
+      return res.status(404).json({
+        success: false,
+        error: "Requested record was not found.",
+        message: "Requested record was not found.",
+      });
+    }
+
+    // Prisma: Foreign key constraint failed
+    if (err.code === "P2003") {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid relation or referenced record does not exist.",
+        message: "Invalid relation or referenced record does not exist.",
+      });
+    }
+
+    // Prisma: Database connection failure / initialization error
+    if (err.name === "PrismaClientInitializationError" || err.code === "P2024") {
+      return res.status(503).json({
+        success: false,
+        error: "Database service is currently unreachable.",
+        message: "Database service is currently unreachable.",
+      });
+    }
+
+    const statusCode = Number(err.status || err.statusCode) || 500;
+
+    // Log diagnostic details on the server safely without leaking tokens, passwords, or hashes
+    const rawMessage = String(err.message || "");
+    const safeLogMessage = rawMessage
+      .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
+      .replace(/"password":\s*"[^"]+"/gi, '"password": "[REDACTED]"')
+      .replace(/passwordHash/gi, "[REDACTED]");
+
+    if (statusCode >= 500) {
+      console.error(`Unhandled server error [${statusCode}]:`, safeLogMessage);
+    }
+
+    // Only expose client-facing message for known 4xx client errors, never for 5xx internal failures
+    if (statusCode >= 400 && statusCode < 500 && err.message) {
+      return res.status(statusCode).json({
         success: false,
         error: err.message,
         message: err.message,
       });
     }
 
-    console.error("Unhandled application error:", err.message);
-
-    return res.status(500).json({
+    return res.status(statusCode >= 400 && statusCode <= 599 ? statusCode : 500).json({
       success: false,
+      error: "Internal server error.",
       message: "Internal server error.",
     });
   });

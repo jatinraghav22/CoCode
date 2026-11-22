@@ -1,5 +1,9 @@
 "use strict";
 
+/** Maximum response body size (2 MB). Applied as a real byte limit while
+ *  reading the response stream, not just from Content-Length headers. */
+const MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024;
+
 class UpstreamError extends Error {
   constructor(message = "Cannot reach the code execution service.", statusCode = 502) {
     super(message);
@@ -39,14 +43,28 @@ class Judge0Service {
    * @param {boolean} [options.useBase64=true]
    * @param {Function} [options.fetchFn]
    * @param {Function} [options.sleepFn]
+   * @param {number} [options.maxResponseBodyBytes=2097152]
    */
   constructor(options = {}) {
     const rawBaseUrl = options.baseUrl || process.env.JUDGE0_BASE_URL || "https://ce.judge0.com";
     this.baseUrl = rawBaseUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey || process.env.JUDGE0_API_KEY || process.env.JUDGE0_AUTH_TOKEN || null;
-    this.timeoutMs = Number(options.timeoutMs || process.env.JUDGE0_TIMEOUT_MS || 10000);
-    this.pollIntervalMs = Number(options.pollIntervalMs || process.env.JUDGE0_POLL_INTERVAL_MS || 750);
-    this.maxPollAttempts = Number(options.maxPollAttempts || process.env.JUDGE0_MAX_POLL_ATTEMPTS || 15);
+
+    const rawTimeout = Number(options.timeoutMs ?? process.env.JUDGE0_TIMEOUT_MS ?? 10000);
+    this.timeoutMs = Number.isFinite(rawTimeout) && rawTimeout >= 1000 && rawTimeout <= 60000 ? rawTimeout : 10000;
+
+    const rawPollInterval = Number(options.pollIntervalMs ?? process.env.JUDGE0_POLL_INTERVAL_MS ?? 750);
+    this.pollIntervalMs = Number.isFinite(rawPollInterval) && rawPollInterval >= 100 && rawPollInterval <= 5000 ? rawPollInterval : 750;
+
+    const rawMaxPoll = Number(options.maxPollAttempts ?? process.env.JUDGE0_MAX_POLL_ATTEMPTS ?? 15);
+    this.maxPollAttempts = Number.isFinite(rawMaxPoll) && rawMaxPoll >= 1 && rawMaxPoll <= 60 ? rawMaxPoll : 15;
+
+    const rawTotalTimeout = Number(options.totalTimeoutMs ?? process.env.JUDGE0_TOTAL_TIMEOUT_MS ?? 15000);
+    this.totalTimeoutMs = Number.isFinite(rawTotalTimeout) && rawTotalTimeout >= 3000 && rawTotalTimeout <= 60000 ? rawTotalTimeout : 15000;
+
+    const rawMaxBody = Number(options.maxResponseBodyBytes ?? MAX_RESPONSE_BODY_BYTES);
+    this.maxResponseBodyBytes = Number.isFinite(rawMaxBody) && rawMaxBody >= 1 && rawMaxBody <= 10 * 1024 * 1024 ? rawMaxBody : MAX_RESPONSE_BODY_BYTES;
+
     this.useBase64 = options.useBase64 !== undefined ? Boolean(options.useBase64) : true;
     this.fetchFn = typeof options.fetchFn === "function" ? options.fetchFn : globalThis.fetch;
     this.sleepFn =
@@ -107,7 +125,90 @@ class Judge0Service {
   }
 
   /**
+   * Reads and returns the response body as a parsed JSON object, enforcing
+   * a real byte limit while reading. This protects against oversized
+   * responses regardless of whether Content-Length is present, absent,
+   * inaccurate, or the response uses chunked transfer encoding.
+   *
+   * @param {Response} response  - Fetch Response object (or mock with .body / .text / .json)
+   * @param {string} context     - Human-readable label for error messages (e.g. "submission", "poll")
+   * @returns {Promise<Object>}  - Parsed JSON body
+   * @throws {UpstreamError}     - On oversized body, malformed JSON, or stream error
+   */
+  async _readBoundedJson(response, context = "response") {
+    const limit = this.maxResponseBodyBytes;
+    const displayLimit = limit >= 1024 * 1024 ? `${Math.round(limit / 1024 / 1024)} MB` : `${Math.round(limit / 1024)} KB`;
+
+    // 1. Early rejection when Content-Length is known and exceeds the limit
+    const clHeader = response.headers?.get?.("content-length");
+    if (clHeader) {
+      const cl = Number(clHeader);
+      if (Number.isFinite(cl) && cl > limit) {
+        if (response.body && typeof response.body.getReader === "function") {
+          try {
+            const reader = response.body.getReader();
+            await reader.cancel();
+          } catch {
+            // Ignore cancellation errors safely
+          }
+        }
+        throw new UpstreamError(
+          `Execution service ${context} exceeds maximum allowed size (${displayLimit}).`
+        );
+      }
+    }
+
+    // 2. Reject responses that have no readable streaming body.
+    // Calling .text() or .json() directly on an unbuffered response buffers an unbounded
+    // body into memory before verifying its size. We reject responses without a streaming body.
+    if (!response.body || typeof response.body.getReader !== "function") {
+      throw new UpstreamError(
+        `Execution service ${context} has no readable streaming body.`
+      );
+    }
+
+    // 3. Stream-based bounded read: chunk-by-chunk enforcement
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkBytes = value ? (value.byteLength || value.length || 0) : 0;
+        totalBytes += chunkBytes;
+
+        if (totalBytes > limit) {
+          try {
+            await reader.cancel();
+          } catch {
+            // Safe cleanup
+          }
+          throw new UpstreamError(
+            `Execution service ${context} exceeds maximum allowed size (${displayLimit}).`
+          );
+        }
+
+        chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
+      }
+    } catch (err) {
+      if (err instanceof UpstreamError) throw err;
+      throw new UpstreamError(`Execution service ${context} stream error: ${err.message}`);
+    }
+
+    const combined = Buffer.concat(chunks);
+    try {
+      return JSON.parse(combined.toString("utf8"));
+    } catch {
+      throw new UpstreamError(`Execution service returned invalid JSON ${context}.`);
+    }
+  }
+
+  /**
    * Normalizes a raw Judge0 submission execution result.
+   * Enforces output size boundaries to protect backend memory and frontend rendering.
    *
    * @param {Object} raw
    * @returns {Object}
@@ -125,12 +226,25 @@ class Judge0Service {
       };
     }
 
+    const MAX_OUTPUT_LENGTH = 100 * 1024; // 100 KB max per field
+
+    const truncate = (val) => {
+      if (val === null || val === undefined) return null;
+      if (typeof val === "string" && val.length > MAX_OUTPUT_LENGTH) {
+        return val.slice(0, MAX_OUTPUT_LENGTH) + "\n... [output truncated: exceeded maximum display limit]";
+      }
+      return val;
+    };
+
     const decode = (val) => {
       if (val === undefined || val === null) return null;
+      let decodedStr;
       if (this.useBase64) {
-        return this.decodeBase64(val);
+        decodedStr = this.decodeBase64(val);
+      } else {
+        decodedStr = typeof val === "string" ? val : String(val);
       }
-      return typeof val === "string" ? val : String(val);
+      return truncate(decodedStr);
     };
 
     return {
@@ -164,6 +278,13 @@ class Judge0Service {
       throw new Error("sourceCode must be a string.");
     }
 
+    const overallDeadline = Date.now() + this.totalTimeoutMs;
+    const subRemaining = overallDeadline - Date.now();
+    if (subRemaining <= 0) {
+      throw new TimeoutError("Judge0 execution exceeded total deadline before submission.");
+    }
+    const subTimeout = Math.min(this.timeoutMs, subRemaining);
+
     const headers = this.getHeaders();
     const payload = {
       language_id: languageId,
@@ -184,7 +305,7 @@ class Judge0Service {
         method: "POST",
         headers,
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(subTimeout),
       });
     } catch (err) {
       if (err.name === "TimeoutError" || err.name === "AbortError") {
@@ -197,17 +318,22 @@ class Judge0Service {
       if (submissionResponse.status === 429) {
         throw new ServiceUnavailableError("Execution service rate limit exceeded.");
       }
+      if (submissionResponse.status === 401 || submissionResponse.status === 403) {
+        throw new UpstreamError("Execution service authentication failed.", 502);
+      }
+      if (submissionResponse.status === 400) {
+        throw new UpstreamError("Execution service rejected submission parameters.", 400);
+      }
       throw new UpstreamError(
         `Execution service returned HTTP ${submissionResponse.status}.`,
-        submissionResponse.status >= 500 ? 502 : 502
+        502
       );
     }
 
-    let submissionData;
-    try {
-      submissionData = await submissionResponse.json();
-    } catch {
-      throw new UpstreamError("Execution service returned invalid JSON response.");
+    const submissionData = await this._readBoundedJson(submissionResponse, "submission response");
+
+    if (!submissionData || typeof submissionData !== "object") {
+      throw new UpstreamError("Execution service returned malformed response.");
     }
 
     // Check if response is already finished (synchronous response)
@@ -220,31 +346,44 @@ class Judge0Service {
       throw new UpstreamError("Execution service did not return a submission token.");
     }
 
-    // Poll for asynchronous result
-    return this.pollResult(token);
+    // Poll for asynchronous result with overall deadline
+    return this.pollResult(token, overallDeadline);
   }
 
   /**
    * Polls Judge0 for submission results until complete or timed out.
    *
    * @param {string} token
+   * @param {number} [overallDeadline]
    * @returns {Promise<Object>} Normalized execution response.
    */
-  async pollResult(token) {
+  async pollResult(token, overallDeadline = Date.now() + this.totalTimeoutMs) {
     const headers = this.getHeaders();
     const resultUrl = `${this.baseUrl}/submissions/${encodeURIComponent(
       token
     )}?base64_encoded=${this.useBase64}&fields=stdout,stderr,compile_output,message,status,time,memory`;
 
     for (let attempt = 1; attempt <= this.maxPollAttempts; attempt += 1) {
-      await this.sleepFn(this.pollIntervalMs);
+      const remainingBeforeSleep = overallDeadline - Date.now();
+      if (remainingBeforeSleep <= 0) {
+        throw new TimeoutError("Execution took too long to complete. Total deadline exceeded.");
+      }
+
+      await this.sleepFn(Math.min(this.pollIntervalMs, remainingBeforeSleep));
+
+      const remainingForRequest = overallDeadline - Date.now();
+      if (remainingForRequest <= 0) {
+        throw new TimeoutError("Execution took too long to complete. Total deadline exceeded.");
+      }
+
+      const pollTimeout = Math.min(this.timeoutMs, remainingForRequest);
 
       let response;
       try {
         response = await this.fetchFn(resultUrl, {
           method: "GET",
           headers,
-          signal: AbortSignal.timeout(this.timeoutMs),
+          signal: AbortSignal.timeout(pollTimeout),
         });
       } catch (err) {
         if (err.name === "TimeoutError" || err.name === "AbortError") {
@@ -257,14 +396,16 @@ class Judge0Service {
         if (response.status === 429) {
           throw new ServiceUnavailableError("Execution service busy during status polling.");
         }
+        if (response.status === 401 || response.status === 403) {
+          throw new UpstreamError("Execution service authentication error during polling.", 502);
+        }
         throw new UpstreamError(`Execution service poll returned HTTP ${response.status}.`);
       }
 
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        throw new UpstreamError("Execution service poll returned invalid JSON.");
+      const data = await this._readBoundedJson(response, "poll response");
+
+      if (!data || typeof data !== "object") {
+        throw new UpstreamError("Execution service poll returned malformed response.");
       }
 
       const statusId = data?.status?.id;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Search, FileCode, FileText, FileJson } from "lucide-react";
+import { Search, FileCode } from "lucide-react";
 
 export default function QuickOpen({
   isOpen,

@@ -461,24 +461,104 @@ class RoomStateStore {
 
   /**
    * Flushes any pending debounced saves to TiDB immediately.
-   * Waits for all dirty files and in-flight saves to complete.
-   * Bounded by timeoutMs to avoid blocking process shutdown indefinitely.
+   * The entire flush — including waiting for in-progress hydrations,
+   * collecting dirty files from loaded rooms, and completing database saves —
+   * is bounded by a single overall deadline (timeoutMs).
+   *
+   * When hydration times out, reports both:
+   *   1. Every room still being hydrated (type: "room", fileId: null)
+   *   2. Every dirty or in-flight file in already-loaded rooms (type: "file", fileId: <id>)
+   *
+   * Does not return early before collecting dirty files from loaded rooms.
+   * Avoids duplicate entries.
+   *
+   * Note: `Promise.race` does NOT cancel pending database operations on the
+   * database server. The timeout bounds the server's waiting time so process
+   * termination is never stalled indefinitely.
    *
    * @param {string} [roomCode]
    * @param {Object} [options]
    * @param {number} [options.timeoutMs=10000]
-   * @returns {Promise<{ success: boolean, unsaved: Array }>}
+   * @returns {Promise<{ success: boolean, unsaved: Array, timedOut: boolean }>}
    */
   async flush(roomCode = null, { timeoutMs = 10000 } = {}) {
     if (!this._roomService) {
-      return { success: true, unsaved: [] };
+      return { success: true, unsaved: [], timedOut: false };
     }
 
+    const deadline = Date.now() + timeoutMs;
+    let timedOut = false;
+    const unsaved = [];
+    const seenKeys = new Set();
+
+    const addUnsaved = (entry) => {
+      const key = `${entry.type || "file"}:${entry.roomCode}:${entry.fileId || "*"}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        unsaved.push(entry);
+      }
+    };
+
+    // Helper: races a promise against the remaining deadline.
+    // Returns { value, timedOut } so the caller can inspect both outcomes.
+    const raceDeadline = (promise) => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        return Promise.resolve({ value: undefined, timedOut: true });
+      }
+      let handle = null;
+      const timer = new Promise((resolve) => {
+        handle = setTimeout(() => resolve({ value: undefined, timedOut: true }), remaining);
+      });
+      return Promise.race([
+        promise.then(
+          (v) => { if (handle) clearTimeout(handle); return { value: v, timedOut: false }; },
+          (e) => { if (handle) clearTimeout(handle); throw e; }
+        ),
+        timer,
+      ]);
+    };
+
+    // 1. Await in-progress room hydration under the deadline so all
+    //    documents are discovered before we try to save them.
+    if (this._loadingPromises.size > 0) {
+      const loadingEntries = roomCode
+        ? (this._loadingPromises.has(roomCode.toUpperCase())
+            ? [[roomCode.toUpperCase(), this._loadingPromises.get(roomCode.toUpperCase())]]
+            : [])
+        : Array.from(this._loadingPromises.entries());
+
+      if (loadingEntries.length > 0) {
+        try {
+          const hydrationResult = await raceDeadline(
+            Promise.allSettled(loadingEntries.map(([, p]) => p))
+          );
+          if (hydrationResult.timedOut) {
+            timedOut = true;
+            console.error(`Flush deadline expired while awaiting room hydration (${timeoutMs}ms).`);
+            for (const [loadingCode] of loadingEntries) {
+              addUnsaved({
+                type: "room",
+                roomCode: loadingCode,
+                fileId: null,
+                error: "Room hydration timed out",
+              });
+            }
+          }
+        } catch {
+          // Hydration errors are handled within ensureRoomLoaded
+        }
+      }
+    }
+
+    // 2. Gather rooms and dirty files from already-loaded rooms.
+    // Do NOT return early even if hydration timed out; always collect
+    // dirty or in-flight files from loaded rooms.
     const roomsToFlush = roomCode
       ? [this._rooms.get(roomCode.toUpperCase())].filter(Boolean)
       : Array.from(this._rooms.values());
 
-    const savePromises = [];
+    const saveTargets = [];
 
     for (const room of roomsToFlush) {
       for (const file of room.files.values()) {
@@ -488,54 +568,84 @@ class RoomStateStore {
         }
 
         if (file.isDirty || file.inFlightSave) {
-          savePromises.push(
-            (async () => {
-              try {
-                await this._executeSave(room.code, file);
-              } catch (err) {
-                return { roomCode: room.code, fileId: file.fileId, error: err.message };
-              }
-              return null;
-            })()
-          );
+          saveTargets.push({ roomCode: room.code, file });
         }
       }
     }
 
-    if (savePromises.length === 0) {
-      return { success: true, unsaved: [] };
-    }
+    // 3. If deadline is already exhausted (e.g. hydration used up all budget),
+    // record all dirty files as unsaved immediately.
+    // Otherwise, attempt to execute and await saves under remaining deadline.
+    const remainingTime = deadline - Date.now();
+    if (remainingTime <= 0 && saveTargets.length > 0) {
+      timedOut = true;
+      for (const { roomCode: rCode, file } of saveTargets) {
+        addUnsaved({
+          type: "file",
+          roomCode: rCode,
+          fileId: file.fileId,
+          error: "Save timed out",
+        });
+      }
+    } else if (saveTargets.length > 0) {
+      const savePromises = [];
+      for (const { roomCode: rCode, file } of saveTargets) {
+        savePromises.push(
+          (async () => {
+            try {
+              await this._executeSave(rCode, file);
+              return null;
+            } catch (err) {
+              return {
+                type: "file",
+                roomCode: rCode,
+                fileId: file.fileId,
+                error: err.message,
+              };
+            }
+          })()
+        );
+      }
 
-    let timeoutHandle = null;
-    const timeoutPromise = new Promise((resolve) => {
-      timeoutHandle = setTimeout(() => resolve("TIMEOUT"), timeoutMs);
-    });
-
-    const unsaved = [];
-    try {
-      const result = await Promise.race([Promise.all(savePromises), timeoutPromise]);
-      if (result === "TIMEOUT") {
-        console.error(`Flush timed out after ${timeoutMs}ms.`);
-        for (const room of roomsToFlush) {
-          for (const file of room.files.values()) {
-            if (file.isDirty) {
-              unsaved.push({ roomCode: room.code, fileId: file.fileId, error: "Timed out" });
+      try {
+        const saveResult = await raceDeadline(Promise.all(savePromises));
+        if (saveResult.timedOut) {
+          timedOut = true;
+          console.error(`Flush timed out after ${timeoutMs}ms with ${savePromises.length} save(s) outstanding.`);
+          // Report every file that is still dirty or in-flight
+          for (const { roomCode: rCode, file } of saveTargets) {
+            if (file.isDirty || file.inFlightSave) {
+              addUnsaved({
+                type: "file",
+                roomCode: rCode,
+                fileId: file.fileId,
+                error: "Save timed out",
+              });
+            }
+          }
+        } else if (Array.isArray(saveResult.value)) {
+          for (const item of saveResult.value) {
+            if (item) {
+              addUnsaved(item);
             }
           }
         }
-      } else if (Array.isArray(result)) {
-        for (const item of result) {
-          if (item) unsaved.push(item);
+      } catch (err) {
+        for (const { roomCode: rCode, file } of saveTargets) {
+          if (file.isDirty || file.inFlightSave) {
+            addUnsaved({
+              type: "file",
+              roomCode: rCode,
+              fileId: file.fileId,
+              error: err.message,
+            });
+          }
         }
       }
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
 
-    return {
-      success: unsaved.length === 0,
-      unsaved,
-    };
+    const success = unsaved.length === 0 && !timedOut;
+    return { success, unsaved, timedOut };
   }
 
   // ─── Socket Presence & Multi-Tab Tracking ──────────────────────────────────

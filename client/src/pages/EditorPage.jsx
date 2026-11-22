@@ -1436,7 +1436,7 @@ export default function EditorPage() {
   }
 
   // Execute Code via backend Judge0 compiler API
-  async function handleRunCode() {
+  const handleRunCode = useCallback(async () => {
     if (!activeFile) return;
     setIsExecuting(true);
     setBottomPanelTab("output");
@@ -1494,7 +1494,7 @@ export default function EditorPage() {
     } finally {
       setIsExecuting(false);
     }
-  }
+  }, [activeFile, token, stdinValue, projectId]);
 
   // Chat message send (Phase 6)
   function handleSendMessage(e) {

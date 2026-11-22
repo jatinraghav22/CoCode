@@ -31,6 +31,32 @@ const MAX_UPDATE_BYTES = 500 * 1024;
 const MAX_CHAT_LENGTH = 2000;
 
 /**
+ * In-memory sliding-window per-socket rate limiter.
+ * Protects event handlers from high-frequency message flood.
+ * Note: Counters are per-process and reset upon reconnection.
+ *
+ * @param {import("socket.io").Socket} socket
+ * @param {string} eventType
+ * @param {number} maxCount
+ * @param {number} windowMs
+ * @returns {boolean}
+ */
+function checkSocketRateLimit(socket, eventType, maxCount, windowMs) {
+  if (!socket._rateLimits) {
+    socket._rateLimits = new Map();
+  }
+  const now = Date.now();
+  let limiter = socket._rateLimits.get(eventType);
+  if (!limiter || now > limiter.resetTime) {
+    limiter = { count: 1, resetTime: now + windowMs };
+    socket._rateLimits.set(eventType, limiter);
+    return true;
+  }
+  limiter.count += 1;
+  return limiter.count <= maxCount;
+}
+
+/**
  * Attaches Socket.IO to the existing http.Server and wires up all
  * collaboration event handlers.
  *
@@ -143,20 +169,29 @@ function createSocketHandler(httpServer, options) {
 
     // ── room:sync ──────────────────────────────────────────────────────────
     socket.on("room:sync", async () => {
-      const roomCode = socket.currentRoom;
-      if (!roomCode) {
-        return socket.emit("room:error", { message: "You are not in a room." });
-      }
+      try {
+        if (!checkSocketRateLimit(socket, "sync", 6, 10000)) {
+          return socket.emit("room:error", { message: "Room sync rate limit exceeded." });
+        }
 
-      // Re-verify authorization
-      const isMember = await roomService.isParticipant(roomCode, socket.userId);
-      if (!isMember) {
-        return socket.emit("room:error", { message: "Access denied to room." });
-      }
+        const roomCode = socket.currentRoom;
+        if (!roomCode) {
+          return socket.emit("room:error", { message: "You are not in a room." });
+        }
 
-      const snapshot = roomStateStore.getRoomSnapshot(roomCode);
-      const presence = roomStateStore.getPresence(roomCode);
-      socket.emit("room:state", { state: snapshot, presence });
+        // Re-verify authorization
+        const isMember = await roomService.isParticipant(roomCode, socket.userId);
+        if (!isMember) {
+          return socket.emit("room:error", { message: "Access denied to room." });
+        }
+
+        const snapshot = roomStateStore.getRoomSnapshot(roomCode);
+        const presence = roomStateStore.getPresence(roomCode);
+        socket.emit("room:state", { state: snapshot, presence });
+      } catch (err) {
+        console.error("room:sync error:", err.message);
+        socket.emit("room:error", { message: "Failed to synchronize room state." });
+      }
     });
 
     // ── room:leave ─────────────────────────────────────────────────────────
@@ -197,6 +232,10 @@ function createSocketHandler(httpServer, options) {
     try {
       if (roomStateStore.isShuttingDown()) {
         return socket.emit("room:error", { message: "Server is shutting down. Room joining is unavailable." });
+      }
+
+      if (!checkSocketRateLimit(socket, "join", 10, 10000)) {
+        return socket.emit("room:error", { message: "Room join rate limit exceeded. Please wait a moment." });
       }
 
       const rawCode = (payload?.roomCode || payload?.room || "")
@@ -270,6 +309,10 @@ function createSocketHandler(httpServer, options) {
         return socket.emit("room:error", { message: "Server is shutting down. Edits are temporarily locked." });
       }
 
+      if (!checkSocketRateLimit(socket, "yjs", 150, 5000)) {
+        return socket.emit("room:error", { message: "Collaboration update rate limit exceeded." });
+      }
+
       const roomCode = socket.currentRoom;
       if (!roomCode) {
         return socket.emit("room:error", { message: "You are not in a room." });
@@ -279,7 +322,20 @@ function createSocketHandler(httpServer, options) {
       if (!fileId || typeof fileId !== "string" || fileId.length > 200) return;
       if (!update) return;
 
-      const updateBytes = update instanceof Uint8Array ? update : new Uint8Array(update);
+      let updateBytes;
+      try {
+        if (update instanceof Uint8Array) {
+          updateBytes = update;
+        } else if (Array.isArray(update) || (update && typeof update === "object")) {
+          updateBytes = new Uint8Array(update);
+        } else {
+          return socket.emit("room:error", { message: "Invalid Yjs update payload." });
+        }
+      } catch {
+        return socket.emit("room:error", { message: "Failed to parse Yjs update payload." });
+      }
+
+      if (!updateBytes || updateBytes.byteLength === 0) return;
 
       if (updateBytes.byteLength > MAX_UPDATE_BYTES) {
         return socket.emit("room:error", { message: "Yjs update exceeds payload limit." });
@@ -309,6 +365,10 @@ function createSocketHandler(httpServer, options) {
     try {
       if (roomStateStore.isShuttingDown()) {
         return socket.emit("room:error", { message: "Server is shutting down. Edits are temporarily locked." });
+      }
+
+      if (!checkSocketRateLimit(socket, "code", 40, 5000)) {
+        return socket.emit("room:error", { message: "Code update rate limit exceeded." });
       }
 
       const roomCode = socket.currentRoom;
@@ -358,6 +418,10 @@ function createSocketHandler(httpServer, options) {
   function handleChat(io, socket, text, emitLegacy = false, clientMsgId = null) {
     const roomCode = socket.currentRoom;
     if (!roomCode) return;
+
+    if (!checkSocketRateLimit(socket, "chat", 15, 5000)) {
+      return socket.emit("room:error", { message: "Chat rate limit exceeded. Please wait a moment." });
+    }
 
     const safeText = (text || "").toString().trim();
     if (!safeText || safeText.length > MAX_CHAT_LENGTH) return;

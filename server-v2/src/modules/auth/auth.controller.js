@@ -84,6 +84,16 @@ class AuthController {
         user: result.user,
       });
     } catch (error) {
+      if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+          error: error.message,
+        });
+      }
+      if (typeof next === "function") {
+        return next(error);
+      }
       console.error("Login error:", error.message);
       return res.status(500).json({
         success: false,

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Terminal, Trash2, Play, ShieldCheck, CornerDownLeft } from "lucide-react";
+import { Terminal, Trash2, ShieldCheck } from "lucide-react";
 
 const INITIAL_WELCOME = [
   "CoCode Integrated Developer Terminal [Version 2.0.0]",
@@ -14,7 +14,7 @@ export default function TerminalConsole({
   projectName = "Default Workspace",
   userName = "developer",
   onRunCode,
-  isExecuting = false,
+  isExecuting: _isExecuting = false,
 }) {
   const [lines, setLines] = useState(INITIAL_WELCOME);
   const [inputVal, setInputVal] = useState("");

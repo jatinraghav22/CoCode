@@ -14,6 +14,7 @@ import App from "./App.jsx";
 import { ThemeProvider } from "./ThemeContext.jsx";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 // Route-level code splitting to optimize bundle size and speed up page load
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
@@ -62,11 +63,12 @@ function RootRoute() {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <AuthProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ThemeProvider>
+          <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
               {/* Conditional Root: Guest Homepage or Authenticated Dashboard */}
               <Route path="/" element={<RootRoute />} />
 
@@ -164,5 +166,6 @@ createRoot(document.getElementById("root")).render(
         </BrowserRouter>
       </ThemeProvider>
     </AuthProvider>
+    </ErrorBoundary>
   </StrictMode>
 );

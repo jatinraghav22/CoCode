@@ -211,6 +211,30 @@ test("Judge0Service - constructs request headers with and without API key", () =
   assert.equal(headersWithKey["X-RapidAPI-Host"], "judge0-ce.p.rapidapi.com");
 });
 
+function createMockStream(data, status = 200) {
+  const jsonStr = typeof data === "string" ? data : JSON.stringify(data);
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => null },
+    body: {
+      getReader: () => {
+        let sent = false;
+        return {
+          read: async () => {
+            if (!sent) {
+              sent = true;
+              return { done: false, value: Buffer.from(jsonStr, "utf8") };
+            }
+            return { done: true, value: undefined };
+          },
+          cancel: async () => {},
+        };
+      },
+    },
+  };
+}
+
 test("Judge0Service - handles synchronous submission response (immediate result)", async () => {
   const mockFetch = async (url, options) => {
     assert.match(url, /\/submissions/);
@@ -219,18 +243,14 @@ test("Judge0Service - handles synchronous submission response (immediate result)
     assert.equal(body.cpu_time_limit, 2);
     assert.equal(body.enable_network, false);
 
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        status: { id: 3, description: "Accepted" },
-        stdout: Buffer.from("Hello from Python!\n").toString("base64"),
-        stderr: null,
-        compile_output: null,
-        time: "0.021",
-        memory: 3200,
-      }),
-    };
+    return createMockStream({
+      status: { id: 3, description: "Accepted" },
+      stdout: Buffer.from("Hello from Python!\n").toString("base64"),
+      stderr: null,
+      compile_output: null,
+      time: "0.021",
+      memory: 3200,
+    });
   };
 
   const service = new Judge0Service({ fetchFn: mockFetch, useBase64: true });
@@ -253,48 +273,32 @@ test("Judge0Service - handles asynchronous polling with completion", async () =>
     callCount += 1;
     if (callCount === 1) {
       // Submission response with token
-      return {
-        ok: true,
-        status: 201,
-        json: async () => ({ token: "mock-token-abc" }),
-      };
+      return createMockStream({ token: "mock-token-abc" }, 201);
     }
 
     if (callCount === 2) {
       // Polling attempt 1: In Queue (status 1)
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          status: { id: 1, description: "In Queue" },
-        }),
-      };
+      return createMockStream({
+        status: { id: 1, description: "In Queue" },
+      });
     }
 
     if (callCount === 3) {
       // Polling attempt 2: Processing (status 2)
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          status: { id: 2, description: "Processing" },
-        }),
-      };
+      return createMockStream({
+        status: { id: 2, description: "Processing" },
+      });
     }
 
     // Polling attempt 3: Finished (status 3: Accepted)
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        status: { id: 3, description: "Accepted" },
-        stdout: Buffer.from("42\n").toString("base64"),
-        stderr: null,
-        compile_output: null,
-        time: "0.015",
-        memory: 1540,
-      }),
-    };
+    return createMockStream({
+      status: { id: 3, description: "Accepted" },
+      stdout: Buffer.from("42\n").toString("base64"),
+      stderr: null,
+      compile_output: null,
+      time: "0.015",
+      memory: 1540,
+    });
   };
 
   const service = new Judge0Service({
@@ -316,17 +320,13 @@ test("Judge0Service - handles asynchronous polling with completion", async () =>
 });
 
 test("Judge0Service - handles compilation error execution result correctly", async () => {
-  const mockFetch = async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({
-      status: { id: 6, description: "Compilation Error" },
-      stdout: null,
-      stderr: null,
-      compile_output: Buffer.from("error: expected ';' before 'return'").toString("base64"),
-      time: null,
-      memory: null,
-    }),
+  const mockFetch = async () => createMockStream({
+    status: { id: 6, description: "Compilation Error" },
+    stdout: null,
+    stderr: null,
+    compile_output: Buffer.from("error: expected ';' before 'return'").toString("base64"),
+    time: null,
+    memory: null,
   });
 
   const service = new Judge0Service({ fetchFn: mockFetch, useBase64: true });
@@ -342,17 +342,13 @@ test("Judge0Service - handles compilation error execution result correctly", asy
 });
 
 test("Judge0Service - handles runtime error execution result correctly", async () => {
-  const mockFetch = async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({
-      status: { id: 11, description: "Runtime Error (NZEC)" },
-      stdout: null,
-      stderr: Buffer.from("ZeroDivisionError: division by zero").toString("base64"),
-      compile_output: null,
-      time: "0.03",
-      memory: 2000,
-    }),
+  const mockFetch = async () => createMockStream({
+    status: { id: 11, description: "Runtime Error (NZEC)" },
+    stdout: null,
+    stderr: Buffer.from("ZeroDivisionError: division by zero").toString("base64"),
+    compile_output: null,
+    time: "0.03",
+    memory: 2000,
   });
 
   const service = new Judge0Service({ fetchFn: mockFetch, useBase64: true });
@@ -371,13 +367,9 @@ test("Judge0Service - throws TimeoutError when polling attempts are exhausted", 
   const mockFetch = async () => {
     callCount += 1;
     if (callCount === 1) {
-      return { ok: true, status: 201, json: async () => ({ token: "pending-tok" }) };
+      return createMockStream({ token: "pending-tok" }, 201);
     }
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({ status: { id: 2, description: "Processing" } }),
-    };
+    return createMockStream({ status: { id: 2, description: "Processing" } });
   };
 
   const service = new Judge0Service({

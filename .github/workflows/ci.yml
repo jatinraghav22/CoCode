@@ -1,0 +1,66 @@
+name: CoCode CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-test:
+    name: Build, Test & Validate
+    runs-on: ubuntu-latest
+
+    env:
+      CI: true
+      NODE_ENV: test
+      PORT: 5000
+      JWT_SECRET: cocode_dev_jwt_secret_must_be_at_least_32_chars_long!
+      CLIENT_ORIGIN: http://localhost:5173
+      JUDGE0_BASE_URL: https://ce.judge0.com
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: |
+            client/package-lock.json
+            server-v2/package-lock.json
+
+      # ─── Client Dependencies & Verification ───────────────────────────────
+      - name: Install Client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Run Client linting
+        working-directory: client
+        run: npm run lint
+
+      - name: Run Client automated tests
+        working-directory: client
+        run: npm test
+
+      - name: Build Client for production
+        working-directory: client
+        run: npm run build
+
+      # ─── Server-V2 Dependencies & Verification ─────────────────────────────
+      - name: Install Server-V2 dependencies
+        working-directory: server-v2
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: server-v2
+        run: npx prisma generate --schema=prisma/schema.prisma
+
+      - name: Validate Server-V2 syntax & modules
+        working-directory: server-v2
+        run: npm run check
+
+      - name: Run Server-V2 test suite
+        working-directory: server-v2
+        run: npm test

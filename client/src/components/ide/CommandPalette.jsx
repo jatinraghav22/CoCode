@@ -1,21 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import {
-  Search,
-  FilePlus,
-  FolderPlus,
-  Save,
-  Play,
-  Terminal,
-  Files,
-  Sliders,
-  Sparkles,
-  Wrench,
-  Download,
-  X,
-  Code,
-  Palette,
-  Check,
-} from "lucide-react";
+import { Search, Code } from "lucide-react";
 
 export default function CommandPalette({
   isOpen,
