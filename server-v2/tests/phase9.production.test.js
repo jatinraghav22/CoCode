@@ -1376,7 +1376,7 @@ test("PHASE 9 — Shutdown: genuinely hung shutdown reaching deadline triggers f
       setExitCodeFn: (code) => { exitCodeCalled = code; },
       logFn: () => {},
       errorFn: () => {},
-      unrefTimers: true,
+      unrefTimers: false,
     },
   });
 
