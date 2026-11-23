@@ -13,7 +13,7 @@ function resolveDefaultApiUrl() {
     // In production (Vercel, getcocode.app, custom domains), if VITE_API_URL is omitted during build,
     // fallback directly to the production Render backend instead of crashing on localhost:5000.
     if (!isLocalhost) {
-      return "https://cocode-2l13.onrender.com";
+      return "https://cocode-backend-v2.onrender.com";
     }
   }
   return "http://localhost:5000";

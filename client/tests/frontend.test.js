@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 test("Frontend — API configuration strips trailing slashes", () => {
   const normalizeUrl = (url) => (url || "http://localhost:5000").replace(/\/+$/, "");
 
-  assert.equal(normalizeUrl("https://cocode-2l13.onrender.com/"), "https://cocode-2l13.onrender.com");
-  assert.equal(normalizeUrl("https://cocode-2l13.onrender.com///"), "https://cocode-2l13.onrender.com");
+  assert.equal(normalizeUrl("https://cocode-backend-v2.onrender.com/"), "https://cocode-backend-v2.onrender.com");
+  assert.equal(normalizeUrl("https://cocode-backend-v2.onrender.com///"), "https://cocode-backend-v2.onrender.com");
   assert.equal(normalizeUrl("http://localhost:5000"), "http://localhost:5000");
 });
 
