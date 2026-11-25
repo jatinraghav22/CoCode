@@ -2,6 +2,7 @@ const {
   validateUpdateProfileInput,
   validateChangePasswordInput,
 } = require("../../utils/validation");
+const { logger } = require("../../utils/logger");
 
 class UserController {
   constructor(userService) {
@@ -17,6 +18,7 @@ class UserController {
       return res.status(200).json({
         success: true,
         user,
+        profile: user,
       });
     } catch (error) {
       if (error.statusCode === 404 || error.name === "NotFoundError") {
@@ -27,7 +29,7 @@ class UserController {
         });
       }
 
-      console.error("Get profile error:", error.message);
+      logger.error("USER", "Get profile error:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error while retrieving profile.",
@@ -56,6 +58,7 @@ class UserController {
         success: true,
         message: "Profile updated successfully.",
         user: updatedUser,
+        profile: updatedUser,
       });
     } catch (error) {
       if (error.statusCode === 404 || error.name === "NotFoundError") {
@@ -66,7 +69,7 @@ class UserController {
         });
       }
 
-      console.error("Update profile error:", error.message);
+      logger.error("USER", "Update profile error:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error while updating profile.",
@@ -109,7 +112,7 @@ class UserController {
         });
       }
 
-      console.error("Change password error:", error.message);
+      logger.error("USER", "Change password error:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error while changing password.",

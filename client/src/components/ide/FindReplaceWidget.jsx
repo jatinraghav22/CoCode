@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Search,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
-  Replace,
-  ReplaceAll,
   X,
-  CaseSensitive,
-  WholeWord,
-  Regex,
 } from "lucide-react";
 
 export default function FindReplaceWidget({

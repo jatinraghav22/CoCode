@@ -80,9 +80,25 @@ async function createTestServer({ prisma, judge0Service, rateLimiter }) {
 // Integration Tests: Compiler Module
 // ============================================================================
 
-test("1. POST /api/compiler/run - unauthenticated request is rejected with 401", async (t) => {
+test("1. POST /api/compiler/run - guest request without Authorization header succeeds with 200", async (t) => {
   const prisma = createMockPrisma([]);
-  const { baseUrl, close } = await createTestServer({ prisma });
+  const mockJudge0Service = {
+    async execute({ languageId, sourceCode }) {
+      assert.equal(languageId, 100); // Python
+      assert.equal(sourceCode, "print('Hello Guest')");
+      return {
+        status: { id: 3, description: "Accepted" },
+        stdout: "Hello Guest\n",
+        stderr: null,
+        compileOutput: null,
+        message: null,
+        time: "0.012",
+        memory: 3100,
+      };
+    },
+  };
+
+  const { baseUrl, close } = await createTestServer({ prisma, judge0Service: mockJudge0Service });
   t.after(close);
 
   const res = await fetch(`${baseUrl}/api/compiler/run`, {
@@ -90,26 +106,169 @@ test("1. POST /api/compiler/run - unauthenticated request is rejected with 401",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       language: "python",
-      sourceCode: "print(1)",
+      sourceCode: "print('Hello Guest')",
     }),
   });
 
-  assert.equal(res.status, 401);
+  assert.equal(res.status, 200);
   const data = await res.json();
-  assert.equal(data.success, false);
-  assert.match(data.message, /authentication token is required/i);
+  assert.equal(data.success, true);
+  assert.equal(data.stdout, "Hello Guest\n");
+  assert.equal(data.status, "Accepted");
 });
 
-test("2. GET /api/compiler/languages - unauthenticated request is rejected with 401", async (t) => {
+test("2. GET /api/compiler/languages - guest request without Authorization header returns 200 and language list", async (t) => {
   const prisma = createMockPrisma([]);
   const { baseUrl, close } = await createTestServer({ prisma });
   t.after(close);
 
   const res = await fetch(`${baseUrl}/api/compiler/languages`);
 
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.success, true);
+  assert.equal(Array.isArray(data.languages), true);
+  assert.equal(data.languages.length, 5);
+});
+
+test("2b. Protected endpoints still require authentication (e.g. GET /api/auth/me)", async (t) => {
+  const prisma = createMockPrisma([]);
+  const { baseUrl, close } = await createTestServer({ prisma });
+  t.after(close);
+
+  const res = await fetch(`${baseUrl}/api/auth/me`);
   assert.equal(res.status, 401);
   const data = await res.json();
   assert.equal(data.success, false);
+});
+
+test("2c. POST /api/compiler/run - invalid JWT is rejected with 401", async (t) => {
+  const prisma = createMockPrisma([]);
+  const { baseUrl, close } = await createTestServer({ prisma });
+  t.after(close);
+
+  const res = await fetch(`${baseUrl}/api/compiler/run`, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer invalid.malformed.jwt",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      language: "python",
+      sourceCode: "print('Invalid token test')",
+    }),
+  });
+
+  assert.equal(res.status, 401);
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.match(data.message, /invalid authentication token/i);
+});
+
+test("2d. POST /api/compiler/run - expired JWT is rejected with 401", async (t) => {
+  const prisma = createMockPrisma([
+    { id: "usr_exp", name: "Expired User", email: "expired@example.com" },
+  ]);
+  const { baseUrl, close } = await createTestServer({ prisma });
+  t.after(close);
+
+  // Sign token that expired 10 seconds ago
+  const jwt = require("jsonwebtoken");
+  const expiredToken = jwt.sign(
+    { sub: "usr_exp", name: "Expired User", email: "expired@example.com" },
+    TEST_SECRET,
+    { expiresIn: -10, issuer: "cocode-backend-v2", audience: "cocode-client" }
+  );
+
+  const res = await fetch(`${baseUrl}/api/compiler/run`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${expiredToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      language: "python",
+      sourceCode: "print('Expired token test')",
+    }),
+  });
+
+  assert.equal(res.status, 401);
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.match(data.message, /token has expired/i);
+});
+
+test("2e. Activity tracking - guest execution does not track user activity while authenticated execution does", async (t) => {
+  const prisma = createMockPrisma([
+    { id: "usr_active", name: "Active User", email: "active@example.com" },
+  ]);
+
+  const activityRecords = [];
+  const mockActivityService = {
+    async trackActivity(payload) {
+      activityRecords.push(payload);
+      return { id: `act_${activityRecords.length}`, ...payload };
+    },
+  };
+
+  const mockJudge0Service = {
+    async execute() {
+      return {
+        status: { id: 3, description: "Accepted" },
+        stdout: "ok\n",
+        stderr: null,
+        compileOutput: null,
+        time: "0.01",
+        memory: 1000,
+      };
+    },
+  };
+
+  const app = createApp(testConfig, {
+    prisma,
+    judge0Service: mockJudge0Service,
+    activityService: mockActivityService,
+  });
+
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve()))));
+
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  // 1. Guest execution (no Authorization header)
+  const guestRes = await fetch(`${baseUrl}/api/compiler/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language: "python", sourceCode: "print(1)" }),
+  });
+  assert.equal(guestRes.status, 200);
+
+  // Wait a tick for any async background tasks
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(activityRecords.length, 0, "Guest execution must NOT create any activity record");
+
+  // 2. Authenticated execution
+  const token = signAccessToken(
+    { id: "usr_active", name: "Active User", email: "active@example.com" },
+    TEST_SECRET
+  );
+
+  const authRes = await fetch(`${baseUrl}/api/compiler/run`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ language: "python", sourceCode: "print(2)" }),
+  });
+  assert.equal(authRes.status, 200);
+
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(activityRecords.length, 1, "Authenticated execution must create an activity record");
+  assert.equal(activityRecords[0].userId, "usr_active");
+  assert.equal(activityRecords[0].status, "success");
 });
 
 test("3. GET /api/compiler/languages - authenticated request returns 200 and safe language metadata", async (t) => {
@@ -492,19 +651,23 @@ test("11. POST /api/compiler/run - Judge0 timeout returns 504 Gateway Timeout", 
   assert.match(data.message, /timed out/i);
 });
 
-test("12. RateLimiter - compiler endpoint enforces per-user rate limiting", async () => {
+test("12. RateLimiter - compiler endpoint enforces per-user and per-guest-IP rate limiting", async () => {
   // Test rate limiter specifically with keyGenerator
   const limiter = createRateLimiter({
     windowMs: 60 * 1000,
     maxRequests: 2,
-    keyGenerator: (req) => (req.userId ? `user_${req.userId}` : req.ip || "127.0.0.1"),
+    keyGenerator: (req) => (req.userId ? `user_${req.userId}` : `guest_ip_${req.ip || "127.0.0.1"}`),
   });
 
   const reqUser1 = { userId: "usr_1", ip: "127.0.0.1", headers: {} };
   const reqUser2 = { userId: "usr_2", ip: "127.0.0.1", headers: {} };
+  const reqGuest1 = { userId: null, ip: "192.168.1.100", headers: {} };
+  const reqGuest2 = { userId: null, ip: "192.168.1.101", headers: {} };
 
   let statusUser1 = 200;
   let statusUser2 = 200;
+  let statusGuest1 = 200;
+  let statusGuest2 = 200;
 
   const createRes = (cb) => ({
     setHeader: () => {},
@@ -516,6 +679,8 @@ test("12. RateLimiter - compiler endpoint enforces per-user rate limiting", asyn
 
   let next1 = 0;
   let next2 = 0;
+  let nextG1 = 0;
+  let nextG2 = 0;
 
   // User 1 - Request 1
   limiter(reqUser1, createRes((c) => (statusUser1 = c)), () => { next1 += 1; });
@@ -531,4 +696,17 @@ test("12. RateLimiter - compiler endpoint enforces per-user rate limiting", asyn
   limiter(reqUser2, createRes((c) => (statusUser2 = c)), () => { next2 += 1; });
   assert.equal(next2, 1);
   assert.equal(statusUser2, 200);
+
+  // Guest 1 - Request 1 & 2
+  limiter(reqGuest1, createRes((c) => (statusGuest1 = c)), () => { nextG1 += 1; });
+  limiter(reqGuest1, createRes((c) => (statusGuest1 = c)), () => { nextG1 += 1; });
+  // Guest 1 - Request 3 (exceeded)
+  limiter(reqGuest1, createRes((c) => (statusGuest1 = c)), () => { nextG1 += 1; });
+  assert.equal(nextG1, 2);
+  assert.equal(statusGuest1, 429);
+
+  // Guest 2 with different IP should NOT be blocked
+  limiter(reqGuest2, createRes((c) => (statusGuest2 = c)), () => { nextG2 += 1; });
+  assert.equal(nextG2, 1);
+  assert.equal(statusGuest2, 200);
 });

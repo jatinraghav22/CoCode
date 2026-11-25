@@ -54,6 +54,23 @@ import TerminalConsole from "../components/ide/TerminalConsole.jsx";
 import ConfirmModal from "../components/ide/ConfirmModal.jsx";
 import "./EditorPage.css";
 
+const RUNNABLE_LANGUAGES = new Set([
+  "javascript",
+  "js",
+  "node",
+  "python",
+  "py",
+  "python3",
+  "c",
+  "cpp",
+  "c++",
+  "java",
+]);
+
+function isRunnableLanguage(lang) {
+  return typeof lang === "string" && RUNNABLE_LANGUAGES.has(lang.trim().toLowerCase());
+}
+
 // Starter project files matching reference
 const DEFAULT_FILES = [
   {
@@ -247,6 +264,7 @@ export default function EditorPage() {
   const isResizingRef = useRef(false);
   const yDocsRef = useRef(new Map());
   const yBindingRef = useRef(null);
+  const execAbortControllerRef = useRef(null);
 
   // Phase 8.9: Per-file save tracking, view state caching, and autosave timers
   const fileVersionRef = useRef(new Map()); // fileId -> integer revision
@@ -1437,64 +1455,141 @@ export default function EditorPage() {
 
   // Execute Code via backend Judge0 compiler API
   const handleRunCode = useCallback(async () => {
-    if (!activeFile) return;
+    if (!activeFile || isExecuting) return;
+
+    const language = activeFile.language || "javascript";
+    if (!isRunnableLanguage(language)) {
+      setBottomPanelTab("output");
+      setIsBottomPanelCollapsed(false);
+      setExecutionOutput({
+        stdout: "",
+        stderr: `Notice: "${activeFile.name}" has language "${language}".\nExecution runtimes are available for JavaScript (.js), Python (.py), C (.c), C++ (.cpp), and Java (.java).`,
+        compileOutput: "",
+        message: "",
+        status: "Notice",
+        time: null,
+        memory: null,
+      });
+      return;
+    }
+
     setIsExecuting(true);
     setBottomPanelTab("output");
     setIsBottomPanelCollapsed(false);
 
+    const controller = new AbortController();
+    execAbortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort("timeout"), 35000);
+    const startTime = Date.now();
+
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const sourceCode = getLatestFileContent(activeFile.id);
       const response = await fetch(`${API_BASE}/api/compiler/run`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
+        headers,
+        signal: controller.signal,
         body: JSON.stringify({
-          sourceCode: activeFile.content || "",
-          language: activeFile.language || "javascript",
+          sourceCode,
+          language,
           stdin: stdinValue,
           projectId: projectId || undefined,
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      const durationSeconds = ((Date.now() - startTime) / 1000).toFixed(3);
+
       if (!response.ok) {
-        throw new Error(data.error || "Execution failed.");
+        let errMessage = data.message || data.error;
+        if (!errMessage) {
+          if (response.status === 429) {
+            errMessage = "Too many code execution requests. Please wait a moment before trying again.";
+          } else if (response.status === 401) {
+            errMessage = "Authentication failed. Please sign in again or continue as guest.";
+          } else if (response.status === 504) {
+            errMessage = "The compiler service timed out. Please try again.";
+          } else if (response.status === 502 || response.status === 503) {
+            errMessage = "The compiler service is temporarily unavailable. Please try again shortly.";
+          } else {
+            errMessage = `Execution failed with HTTP ${response.status}`;
+          }
+        }
+        throw new Error(errMessage);
       }
+
+      const statusText = data.status || "Finished";
+      const isSuccess =
+        statusText === "Accepted" ||
+        statusText === "Finished" ||
+        (!data.status && !data.stderr && !data.compileOutput);
 
       setExecutionOutput({
         stdout: data.stdout || "",
         stderr: data.stderr || "",
         compileOutput: data.compileOutput || "",
-        status: data.status || "Finished",
-        time: data.time || 0.02,
-        memory: data.memory || 12000,
+        message: data.message || "",
+        status: statusText,
+        time: data.time ?? durationSeconds,
+        memory: data.memory ?? null,
       });
 
       setExecutionHistory((prev) => [
         {
           id: `run-${Date.now()}`,
           timestamp: Date.now(),
-          language: activeFile.language,
-          status: data.status || "Finished",
-          time: `${data.time || 0.02}s`,
-          output: data.stdout || data.stderr || data.compileOutput || "Finished with no output",
+          language,
+          status: isSuccess ? statusText : statusText,
+          time: `${data.time ?? durationSeconds}s`,
+          output: data.stdout || data.stderr || data.compileOutput || data.message || "Finished with no output",
         },
         ...prev,
       ]);
     } catch (err) {
-      setExecutionOutput({
-        stdout: "",
-        stderr: err.message || "An execution error occurred.",
-        compileOutput: "",
-        status: "Error",
-        time: null,
-        memory: null,
-      });
+      if (err?.name === "AbortError") {
+        const isClientTimeout = controller.signal.reason === "timeout";
+        setExecutionOutput({
+          stdout: "",
+          stderr: isClientTimeout
+            ? "Execution request timed out waiting for the compiler service. Please try again."
+            : "Execution halted by user.",
+          compileOutput: "",
+          message: "",
+          status: isClientTimeout ? "Timeout" : "Stopped",
+          time: null,
+          memory: null,
+        });
+      } else {
+        setExecutionOutput({
+          stdout: "",
+          stderr: err.message || "An execution error occurred.",
+          compileOutput: "",
+          message: "",
+          status: "Error",
+          time: null,
+          memory: null,
+        });
+      }
     } finally {
+      clearTimeout(timeoutId);
+      if (execAbortControllerRef.current === controller) {
+        execAbortControllerRef.current = null;
+      }
       setIsExecuting(false);
     }
-  }, [activeFile, token, stdinValue, projectId]);
+  }, [activeFile, isExecuting, token, getLatestFileContent, stdinValue, projectId]);
+
+  const handleStopExecution = useCallback(() => {
+    if (execAbortControllerRef.current) {
+      execAbortControllerRef.current.abort("user");
+      execAbortControllerRef.current = null;
+    }
+    setIsExecuting(false);
+  }, []);
 
   // Chat message send (Phase 6)
   function handleSendMessage(e) {
@@ -1998,7 +2093,7 @@ export default function EditorPage() {
           </button>
 
           {isExecuting ? (
-            <button className="ide-btn-header-stop" onClick={() => setIsExecuting(false)}>
+            <button className="ide-btn-header-stop" onClick={handleStopExecution}>
               <Square size={13} fill="currentColor" />
               <span>Stop</span>
             </button>
@@ -2957,15 +3052,33 @@ export default function EditorPage() {
                     {executionOutput.compileOutput && (
                       <div className="ide-output-compile">{executionOutput.compileOutput}</div>
                     )}
-                    {!executionOutput.stdout && !executionOutput.stderr && !executionOutput.compileOutput && !isExecuting && (
+                    {executionOutput.message && (
+                      <div className="ide-output-stderr">{executionOutput.message}</div>
+                    )}
+                    {!executionOutput.stdout && !executionOutput.stderr && !executionOutput.compileOutput && !executionOutput.message && !isExecuting && (
                       <div style={{ color: "#64748b" }}>Click "Run" or type 'run' in Terminal to compile and execute program.</div>
                     )}
 
-                    {executionOutput.time !== null && (
+                    {(executionOutput.time !== null || (executionOutput.status && executionOutput.status !== "Cleared")) && (
                       <div className="ide-output-meta">
-                        <span>Status: <strong style={{ color: executionOutput.status === "Error" ? "#ef4444" : "#10b981" }}>{executionOutput.status}</strong></span>
-                        {executionOutput.time && <span>Time: {executionOutput.time}s</span>}
-                        {executionOutput.memory && <span>Memory: {(executionOutput.memory / 1024).toFixed(1)} MB</span>}
+                        <span>
+                          Status:{" "}
+                          <strong
+                            style={{
+                              color: ["Accepted", "Finished", "Success"].includes(executionOutput.status)
+                                ? "#10b981"
+                                : "#ef4444",
+                            }}
+                          >
+                            {executionOutput.status}
+                          </strong>
+                        </span>
+                        {executionOutput.time !== null && executionOutput.time !== undefined && (
+                          <span>Time: {executionOutput.time}s</span>
+                        )}
+                        {executionOutput.memory !== null && executionOutput.memory !== undefined && (
+                          <span>Memory: {(executionOutput.memory / 1024).toFixed(1)} MB</span>
+                        )}
                       </div>
                     )}
                   </div>

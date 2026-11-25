@@ -6,6 +6,7 @@ import {
   Plus,
   Search,
   MoreVertical,
+  Edit3,
   Trash2,
   Copy,
   ExternalLink,
@@ -220,6 +221,36 @@ export default function Projects() {
     }
   }
 
+  // Rename Project handler
+  async function handleRenameProject(proj) {
+    if (!token) return;
+    const newName = window.prompt("Enter new project name:", proj.name);
+    if (!newName || !newName.trim() || newName.trim() === proj.name) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${proj.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || "Failed to rename project.");
+      }
+
+      setActiveProjectMenu(null);
+      await fetchProjects(pagination.page);
+    } catch (err) {
+      alert(err.message || "Failed to rename project.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   function handleOpenProject(proj) {
     const lang = proj.defaultLanguage || proj.language || "javascript";
     navigate(`/editor?projectId=${proj.id}&project=${encodeURIComponent(proj.name)}&lang=${encodeURIComponent(lang)}`);
@@ -372,6 +403,15 @@ export default function Projects() {
 
                           {activeProjectMenu === project.id && (
                             <div className="card-dropdown glass-panel">
+                              <button
+                                type="button"
+                                className="dropdown-item"
+                                onClick={() => handleRenameProject(project)}
+                                disabled={actionLoading}
+                              >
+                                <Edit3 size={14} />
+                                <span>Rename</span>
+                              </button>
                               <button
                                 type="button"
                                 className="dropdown-item"

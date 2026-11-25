@@ -56,11 +56,11 @@ class Judge0Service {
     const rawPollInterval = Number(options.pollIntervalMs ?? process.env.JUDGE0_POLL_INTERVAL_MS ?? 750);
     this.pollIntervalMs = Number.isFinite(rawPollInterval) && rawPollInterval >= 100 && rawPollInterval <= 5000 ? rawPollInterval : 750;
 
-    const rawMaxPoll = Number(options.maxPollAttempts ?? process.env.JUDGE0_MAX_POLL_ATTEMPTS ?? 15);
-    this.maxPollAttempts = Number.isFinite(rawMaxPoll) && rawMaxPoll >= 1 && rawMaxPoll <= 60 ? rawMaxPoll : 15;
+    const rawMaxPoll = Number(options.maxPollAttempts ?? process.env.JUDGE0_MAX_POLL_ATTEMPTS ?? 25);
+    this.maxPollAttempts = Number.isFinite(rawMaxPoll) && rawMaxPoll >= 1 && rawMaxPoll <= 60 ? rawMaxPoll : 25;
 
-    const rawTotalTimeout = Number(options.totalTimeoutMs ?? process.env.JUDGE0_TOTAL_TIMEOUT_MS ?? 15000);
-    this.totalTimeoutMs = Number.isFinite(rawTotalTimeout) && rawTotalTimeout >= 3000 && rawTotalTimeout <= 60000 ? rawTotalTimeout : 15000;
+    const rawTotalTimeout = Number(options.totalTimeoutMs ?? process.env.JUDGE0_TOTAL_TIMEOUT_MS ?? 25000);
+    this.totalTimeoutMs = Number.isFinite(rawTotalTimeout) && rawTotalTimeout >= 3000 && rawTotalTimeout <= 60000 ? rawTotalTimeout : 25000;
 
     const rawMaxBody = Number(options.maxResponseBodyBytes ?? MAX_RESPONSE_BODY_BYTES);
     this.maxResponseBodyBytes = Number.isFinite(rawMaxBody) && rawMaxBody >= 1 && rawMaxBody <= 10 * 1024 * 1024 ? rawMaxBody : MAX_RESPONSE_BODY_BYTES;
@@ -290,9 +290,9 @@ class Judge0Service {
       language_id: languageId,
       source_code: this.useBase64 ? this.encodeBase64(sourceCode) : sourceCode,
       stdin: this.useBase64 ? this.encodeBase64(stdin || "") : stdin || "",
-      cpu_time_limit: 2,
+      cpu_time_limit: 5,
       cpu_extra_time: 1,
-      wall_time_limit: 5,
+      wall_time_limit: 10,
       memory_limit: 128000,
       enable_network: false,
     };

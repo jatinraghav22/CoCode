@@ -66,11 +66,11 @@ function loadEnv() {
   const rawPollInterval = Number(process.env.JUDGE0_POLL_INTERVAL_MS || 750);
   const judge0PollIntervalMs = Number.isFinite(rawPollInterval) && rawPollInterval >= 100 && rawPollInterval <= 5000 ? rawPollInterval : 750;
 
-  const rawMaxPoll = Number(process.env.JUDGE0_MAX_POLL_ATTEMPTS || 15);
-  const judge0MaxPollAttempts = Number.isFinite(rawMaxPoll) && rawMaxPoll >= 1 && rawMaxPoll <= 60 ? rawMaxPoll : 15;
+  const rawMaxPoll = Number(process.env.JUDGE0_MAX_POLL_ATTEMPTS || 25);
+  const judge0MaxPollAttempts = Number.isFinite(rawMaxPoll) && rawMaxPoll >= 1 && rawMaxPoll <= 60 ? rawMaxPoll : 25;
 
-  const rawTotalTimeout = Number(process.env.JUDGE0_TOTAL_TIMEOUT_MS || 15000);
-  const judge0TotalTimeoutMs = Number.isFinite(rawTotalTimeout) && rawTotalTimeout >= 3000 && rawTotalTimeout <= 60000 ? rawTotalTimeout : 15000;
+  const rawTotalTimeout = Number(process.env.JUDGE0_TOTAL_TIMEOUT_MS || 25000);
+  const judge0TotalTimeoutMs = Number.isFinite(rawTotalTimeout) && rawTotalTimeout >= 3000 && rawTotalTimeout <= 60000 ? rawTotalTimeout : 25000;
 
   const judge0UseBase64 = process.env.JUDGE0_USE_BASE64 !== "false";
 

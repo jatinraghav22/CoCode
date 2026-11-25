@@ -5,6 +5,7 @@ const { prisma } = require("./config/prisma");
 const { createSocketHandler } = require("./socket");
 const { RoomService } = require("./modules/rooms/room.service");
 const { roomStateStore } = require("./modules/rooms/room.store");
+const { logger } = require("./utils/logger");
 
 /**
  * Overall shutdown deadline in milliseconds.
@@ -247,10 +248,10 @@ function startServer() {
   });
 
   httpServer.listen(config.port, () => {
-    console.log(`CoCode Backend V2 running on port ${config.port}`);
-    console.log(`Environment: ${config.nodeEnv}`);
-    console.log(`Health: http://localhost:${config.port}/api/health`);
-    console.log(`Socket.IO: enabled (real-time collaboration active)`);
+    logger.info("SYSTEM", `CoCode Backend V2 running on port ${config.port}`);
+    logger.info("SYSTEM", `Environment: ${config.nodeEnv}`);
+    logger.info("SYSTEM", `Health: http://localhost:${config.port}/api/health`);
+    logger.info("SYSTEM", `Socket.IO: enabled (real-time collaboration active)`);
   });
 
   const { shutdown } = createShutdownHandler({
@@ -262,16 +263,11 @@ function startServer() {
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("uncaughtException", (err) => {
-    console.error("FATAL: Uncaught exception in server process:", err.message);
+    logger.error("SYSTEM", "FATAL: Uncaught exception in server process:", err);
     shutdown("uncaughtException", { isFatal: true });
   });
   process.on("unhandledRejection", (reason) => {
-    // Log safely: reason may be an Error or a primitive.
-    const message = reason instanceof Error ? reason.message : String(reason ?? "unknown");
-    const safeMessage = message
-      .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
-      .replace(/"password":\s*"[^"]+"/gi, '"password": "[REDACTED]"');
-    console.error("FATAL: Unhandled promise rejection:", safeMessage);
+    logger.error("SYSTEM", "FATAL: Unhandled promise rejection:", reason);
     shutdown("unhandledRejection", { isFatal: true });
   });
 
@@ -282,7 +278,7 @@ if (require.main === module) {
   try {
     startServer();
   } catch (error) {
-    console.error("Failed to start CoCode Backend V2:", error.message);
+    logger.error("SYSTEM", "Failed to start CoCode Backend V2:", error);
     process.exitCode = 1;
   }
 }

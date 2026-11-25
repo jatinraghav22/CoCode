@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { useAuth } from "../AuthContext.jsx";
+import { API_BASE } from "../config/api.js";
 import "./Profile.css";
 
 function GithubIcon(props) {
@@ -54,24 +55,51 @@ function LinkedinIcon(props) {
   );
 }
 
-const PROJECTS_STORAGE_KEY = "cocode-dashboard-projects-v1";
-
-function getProjectsCount() {
-  if (typeof window === "undefined") return 3;
-  try {
-    const raw = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (!raw) return 3;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.length : 3;
-  } catch {
-    return 3;
-  }
-}
-
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const [projectCount, setProjectCount] = useState(null);
 
-  const projectCount = useMemo(() => getProjectsCount(), []);
+  useEffect(() => {
+    setProjectCount(null);
+    let active = true;
+
+    async function loadProjectCount() {
+      if (!token) {
+        setProjectCount(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/projects?page=1&limit=1`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load project count");
+        }
+
+        const data = await response.json();
+        const total = Number(data.pagination?.total);
+
+        if (active) {
+          setProjectCount(Number.isFinite(total) && total >= 0 ? total : null);
+        }
+      } catch {
+        if (active) setProjectCount(null);
+      }
+    }
+
+    loadProjectCount();
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const defaultAvatar =
     user?.avatarUrl ||
@@ -198,7 +226,9 @@ export default function Profile() {
               </div>
               <div className="stat-text-wrap">
                 <span className="stat-label">Total Projects</span>
-                <strong className="stat-value">{projectCount}</strong>
+                <strong className="stat-value">
+                  {projectCount !== null && projectCount !== undefined ? projectCount : "—"}
+                </strong>
               </div>
             </div>
 

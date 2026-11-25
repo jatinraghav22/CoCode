@@ -31,8 +31,19 @@ function assertSecret(value, name, minLength = 32) {
 const JWT_SECRET = process.env.JWT_SECRET;
 assertSecret(JWT_SECRET, "JWT_SECRET", 32);
 
-if (!process.env.DATABASE_URL) {
-    console.error("[STARTUP] FATAL: DATABASE_URL is not set.");
+// Database URL fallback for various cloud MySQL providers
+const resolvedDatabaseUrl =
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.JAWSDB_URL ||
+    process.env.CLEARDB_DATABASE_URL;
+
+if (resolvedDatabaseUrl && !process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = resolvedDatabaseUrl;
+}
+
+if (!resolvedDatabaseUrl) {
+    console.error("[STARTUP] FATAL: DATABASE_URL is not set. Please set DATABASE_URL in your deployment environment.");
     if (isProduction) process.exit(1);
 }
 
@@ -44,7 +55,7 @@ const config = {
     PORT: parseInt(process.env.PORT, 10) || 5000,
 
     // Database
-    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_URL: resolvedDatabaseUrl,
 
     // JWT — issuer and audience add an extra layer of token validation.
     // A token signed by CoCode's server but intended for a different service
@@ -55,7 +66,7 @@ const config = {
     JWT_AUDIENCE: process.env.JWT_AUDIENCE || "cocode-client",
 
     // CORS — restrict to known frontend origins
-    CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
+    CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173,https://getcocode.vercel.app,https://www.getcocode.app,https://getcocode.app",
 
     // Judge0 Compiler
     JUDGE0_BASE_URL: (process.env.JUDGE0_BASE_URL || "https://ce.judge0.com").replace(/\/+$/, ""),

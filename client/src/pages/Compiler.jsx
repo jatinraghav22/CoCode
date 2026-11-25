@@ -249,6 +249,7 @@ export default function Compiler() {
   const [openTabIds, setOpenTabIds] = useState(["f-index-js"]);
   const [activeFileId, setActiveFileId] = useState("f-index-js");
   const [dirtyFiles, setDirtyFiles] = useState({}); // { [fileId]: true }
+  const execAbortControllerRef = useRef(null);
 
   // Folder collapse state
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -760,6 +761,9 @@ export default function Compiler() {
     setBottomPanelTab("output");
     setIsBottomCollapsed(false);
 
+    const controller = new AbortController();
+    execAbortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort("timeout"), 35000);
     const startTime = Date.now();
 
     try {
@@ -771,6 +775,7 @@ export default function Compiler() {
       const response = await fetch(`${API_BASE}/api/compiler/run`, {
         method: "POST",
         headers,
+        signal: controller.signal,
         body: JSON.stringify({
           sourceCode: activeFile.content || "",
           language: activeFile.language,
@@ -778,20 +783,39 @@ export default function Compiler() {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       const durationSeconds = ((Date.now() - startTime) / 1000).toFixed(3);
 
       if (!response.ok) {
-        throw new Error(data.error || `Execution failed with HTTP ${response.status}`);
+        let errMessage = data.message || data.error;
+        if (!errMessage) {
+          if (response.status === 429) {
+            errMessage = "Too many code execution requests. Please wait a moment before trying again.";
+          } else if (response.status === 401) {
+            errMessage = "Authentication failed. Please verify your credentials or continue as guest.";
+          } else if (response.status === 504) {
+            errMessage = "The compiler service timed out. Please try again.";
+          } else if (response.status === 502 || response.status === 503) {
+            errMessage = "The compiler service is temporarily unavailable. Please try again shortly.";
+          } else {
+            errMessage = `Execution failed with HTTP ${response.status}`;
+          }
+        }
+        throw new Error(errMessage);
       }
 
-      const isSuccess = data.status === "Finished" || (!data.stderr && !data.compileOutput);
+      const statusText = data.status || "Finished";
+      const isSuccess =
+        statusText === "Accepted" ||
+        statusText === "Finished" ||
+        (!data.status && !data.stderr && !data.compileOutput);
 
       setExecutionOutput({
         stdout: data.stdout || "",
         stderr: data.stderr || "",
         compileOutput: data.compileOutput || "",
-        status: data.status || "Finished",
+        message: data.message || "",
+        status: statusText,
         time: data.time ?? durationSeconds,
         memory: data.memory ?? null,
       });
@@ -814,19 +838,35 @@ export default function Compiler() {
           status: isSuccess ? "Success" : "Failed",
           time: `${data.time ?? durationSeconds}s`,
           stdout: data.stdout || "",
-          stderr: data.stderr || data.compileOutput || "",
+          stderr: data.stderr || data.compileOutput || data.message || "",
         },
         ...prev.slice(0, 24),
       ]);
     } catch (err) {
-      setExecutionOutput({
-        stdout: "",
-        stderr: err.message || "An execution error occurred.",
-        compileOutput: "",
-        status: "Error",
-        time: null,
-        memory: null,
-      });
+      if (err?.name === "AbortError") {
+        const isClientTimeout = controller.signal.reason === "timeout";
+        setExecutionOutput({
+          stdout: "",
+          stderr: isClientTimeout
+            ? "Execution request timed out waiting for the compiler service. Please try again."
+            : "Execution halted by user.",
+          compileOutput: "",
+          message: "",
+          status: isClientTimeout ? "Timeout" : "Stopped",
+          time: null,
+          memory: null,
+        });
+      } else {
+        setExecutionOutput({
+          stdout: "",
+          stderr: err.message || "An execution error occurred.",
+          compileOutput: "",
+          message: "",
+          status: "Error",
+          time: null,
+          memory: null,
+        });
+      }
 
       setAnalytics((prev) => ({
         ...prev,
@@ -834,18 +874,21 @@ export default function Compiler() {
         failedCount: prev.failedCount + 1,
       }));
     } finally {
+      clearTimeout(timeoutId);
+      if (execAbortControllerRef.current === controller) {
+        execAbortControllerRef.current = null;
+      }
       setIsExecuting(false);
     }
   };
 
   // Stop Execution
   const handleStopExecution = () => {
+    if (execAbortControllerRef.current) {
+      execAbortControllerRef.current.abort("user");
+      execAbortControllerRef.current = null;
+    }
     setIsExecuting(false);
-    setExecutionOutput((prev) => ({
-      ...prev,
-      stderr: (prev.stderr ? prev.stderr + "\n" : "") + "Execution halted by user.",
-      status: "Stopped",
-    }));
   };
 
   // Copy Output to Clipboard
@@ -1887,7 +1930,10 @@ export default function Compiler() {
                         {executionOutput.stderr && (
                           <div className="cc-output-stderr">{executionOutput.stderr}</div>
                         )}
-                        {!executionOutput.stdout && !executionOutput.stderr && !executionOutput.compileOutput && (
+                        {executionOutput.message && (
+                          <div className="cc-output-stderr">{executionOutput.message}</div>
+                        )}
+                        {!executionOutput.stdout && !executionOutput.stderr && !executionOutput.compileOutput && !executionOutput.message && (
                           <div className="cc-output-hint">
                             Output will appear here after clicking "Run Code" (Ctrl+Enter).
                           </div>
@@ -1900,7 +1946,7 @@ export default function Compiler() {
                               Status:{" "}
                               <span
                                 className={
-                                  executionOutput.status === "Finished" || executionOutput.status === "Success"
+                                  ["Accepted", "Finished", "Success"].includes(executionOutput.status)
                                     ? "cc-output-status-ok"
                                     : "cc-output-status-err"
                                 }

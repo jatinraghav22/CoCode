@@ -1,5 +1,7 @@
 "use strict";
 
+const { logger } = require("../../utils/logger");
+
 /**
  * ActivityService — persists and aggregates user-scoped coding activities.
  *
@@ -70,7 +72,7 @@ class ActivityService {
       });
       return record;
     } catch (err) {
-      console.warn("Failed to record coding activity:", err.message);
+      logger.warn("ACTIVITY", "Failed to record coding activity:", err);
       return null;
     }
   }

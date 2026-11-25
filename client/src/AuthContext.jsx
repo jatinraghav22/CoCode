@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { API_BASE } from "./config/api.js";
+import { mergeUserWithProfileExtras, saveProfileExtras } from "./profileStorage.js";
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = "cocode_auth_token";
@@ -45,7 +46,7 @@ export function AuthProvider({ children }) {
 
         const data = await response.json();
         if (active) {
-          setUser(data.user);
+          setUser(mergeUserWithProfileExtras(data.user));
           setToken(storedToken);
         }
       } catch {
@@ -83,8 +84,9 @@ export function AuthProvider({ children }) {
 
       window.localStorage.setItem(TOKEN_KEY, data.token);
       setToken(data.token);
-      setUser(data.user);
-      return { success: true, user: data.user };
+      const authenticatedUser = mergeUserWithProfileExtras(data.user);
+      setUser(authenticatedUser);
+      return { success: true, user: authenticatedUser };
     } catch {
       return {
         success: false,
@@ -108,8 +110,9 @@ export function AuthProvider({ children }) {
 
       window.localStorage.setItem(TOKEN_KEY, data.token);
       setToken(data.token);
-      setUser(data.user);
-      return { success: true, user: data.user };
+      const authenticatedUser = mergeUserWithProfileExtras(data.user);
+      setUser(authenticatedUser);
+      return { success: true, user: authenticatedUser };
     } catch {
       return {
         success: false,
@@ -165,22 +168,24 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/user/profile`, {
-        method: "PUT",
+      const response = await fetch(`${API_BASE}/api/users/me`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(profileData),
+        body: JSON.stringify({ name: profileData?.name ?? user?.name ?? "" }),
       });
 
       const data = await response.json();
       if (!response.ok) {
-        return { success: false, error: data.error || "Failed to update profile." };
+        return { success: false, error: data.error || data.message || "Failed to update profile." };
       }
 
-      setUser(data.profile);
-      return { success: true, profile: data.profile, message: data.message };
+      saveProfileExtras(data.user.id, profileData);
+      const updatedUser = mergeUserWithProfileExtras(data.user);
+      setUser(updatedUser);
+      return { success: true, profile: updatedUser, message: data.message || "Profile updated successfully." };
     } catch {
       return {
         success: false,
@@ -192,13 +197,14 @@ export function AuthProvider({ children }) {
   async function refreshProfile() {
     if (!token) return null;
     try {
-      const response = await fetch(`${API_BASE}/api/user/profile`, {
+      const response = await fetch(`${API_BASE}/api/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
         const data = await response.json();
-        setUser(data.profile);
-        return data.profile;
+        const merged = mergeUserWithProfileExtras(data.user);
+        setUser(merged);
+        return merged;
       }
     } catch {
       // Ignore

@@ -1,6 +1,7 @@
 "use strict";
 
 const { validateRunCodeInput } = require("./compiler.validation");
+const { logger } = require("../../utils/logger");
 
 class CompilerController {
   /**
@@ -28,7 +29,7 @@ class CompilerController {
         languages,
       });
     } catch (error) {
-      console.error("Get compiler languages error:", error.name, error.message.slice(0, 100));
+      logger.error("COMPILER", "Get compiler languages error:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error while fetching supported languages.",
@@ -56,10 +57,10 @@ class CompilerController {
 
       // Track coding activity for authenticated user (genuine code execution event)
       if (this.activityService && req.userId) {
-        const isSuccess =
-          result.status?.id === 3 ||
-          result.status?.description === "Accepted" ||
-          (!result.stderr && !result.compileOutput);
+        const hasStatusId = typeof result.status?.id === "number" && result.status.id > 0;
+        const isSuccess = hasStatusId
+          ? result.status.id === 3
+          : result.status?.description === "Accepted" || (!result.stderr && !result.compileOutput);
         const status = isSuccess ? "success" : "failed";
         const eventType = isSuccess ? "execution_success" : "execution_failed";
         const duration =
@@ -116,7 +117,7 @@ class CompilerController {
       }
 
       // Never log user source code, stdin, or API tokens
-      console.error("Compiler execution error:", error.name, (error.message || "").slice(0, 150));
+      logger.error("COMPILER", "Compiler execution error:", error);
 
       if (error.statusCode === 504 || error.name === "TimeoutError") {
         return res.status(504).json({

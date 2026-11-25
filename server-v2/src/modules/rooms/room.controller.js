@@ -1,5 +1,7 @@
 "use strict";
 
+const { logger } = require("../../utils/logger");
+
 /**
  * RoomController — handles HTTP REST endpoints for room management.
  *
@@ -54,7 +56,7 @@ class RoomController {
         room,
       });
     } catch (error) {
-      console.error("Create room error:", error.message);
+      logger.error("ROOM", "Create room error:", error);
       return res.status(500).json({
         success: false,
         message: "Failed to create room.",
@@ -116,7 +118,7 @@ class RoomController {
         });
       }
 
-      console.error("Join room error:", error.message);
+      logger.error("ROOM", "Join room error:", error);
       return res.status(500).json({
         success: false,
         message: "Failed to join room.",
@@ -169,7 +171,7 @@ class RoomController {
         room,
       });
     } catch (error) {
-      console.error("Get room error:", error.message);
+      logger.error("ROOM", "Get room error:", error);
       return res.status(500).json({
         success: false,
         message: "Failed to fetch room.",
@@ -217,7 +219,7 @@ class RoomController {
         })),
       });
     } catch (error) {
-      console.error("Get room documents error:", error.message);
+      logger.error("ROOM", "Get room documents error:", error);
       return res.status(500).json({
         success: false,
         message: "Failed to fetch room documents.",

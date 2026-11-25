@@ -230,9 +230,9 @@ Compilation and runtime errors are execution outcomes, returned as HTTP `200 OK`
    - `sourceCode`: Max 30,000 characters. Submissions exceeding this limit return HTTP `413 Payload Too Large`.
    - `stdin`: Max 10,000 characters. Submissions exceeding this limit return HTTP `400 Bad Request`.
 3. **Execution Resource Limits (Judge0 Sandboxing)**:
-   - `cpu_time_limit`: 2 seconds
+   - `cpu_time_limit`: 5 seconds
    - `cpu_extra_time`: 1 second
-   - `wall_time_limit`: 5 seconds
+   - `wall_time_limit`: 10 seconds
    - `memory_limit`: 128,000 KB (128 MB)
    - `enable_network`: `false` (network isolation disabled inside sandbox)
 4. **Rate Limiting**:

@@ -2,7 +2,7 @@
 
 const { Router } = require("express");
 const { createRateLimiter } = require("../middleware/rateLimiter");
-const { createAuthMiddleware } = require("../middleware/auth");
+const { createAuthMiddleware, createOptionalAuthMiddleware } = require("../middleware/auth");
 const { CompilerService } = require("../modules/compiler/compiler.service");
 const { Judge0Service } = require("../modules/compiler/judge0.service");
 const { CompilerController } = require("../modules/compiler/compiler.controller");
@@ -15,7 +15,7 @@ const { CompilerController } = require("../modules/compiler/compiler.controller"
  * @param {Object} options.prisma - PrismaClient instance.
  * @param {Object} [options.compilerService] - Optional overridden CompilerService.
  * @param {Object} [options.judge0Service] - Optional overridden Judge0Service.
- * @param {Object} [options.authMiddleware] - Optional overridden requireAuth middleware.
+ * @param {Object} [options.authMiddleware] - Optional overridden auth middleware for optional authentication.
  * @param {Object} [options.rateLimiter] - Optional overridden compilerLimiter middleware.
  * @returns {Router} Express router.
  */
@@ -25,15 +25,13 @@ function createCompilerRouter(options = {}) {
 
   const isTest = (config && config.nodeEnv === "test") || process.env.NODE_ENV === "test";
 
-  const requireAuth =
+  const optionalAuth =
     options.authMiddleware ||
-    createAuthMiddleware({
-      jwtSecret: config.jwtSecret,
+    createOptionalAuthMiddleware({
+      jwtSecret: config?.jwtSecret,
       prisma,
-      jwtIssuer: config.jwtIssuer,
-      jwtAudience: config.jwtAudience,
-      userNotFoundStatus: 401,
-      userNotFoundMessage: "User account no longer exists.",
+      jwtIssuer: config?.jwtIssuer,
+      jwtAudience: config?.jwtAudience,
     });
 
   const compilerLimiter =
@@ -42,7 +40,7 @@ function createCompilerRouter(options = {}) {
       windowMs: 60 * 1000,
       maxRequests: 20,
       message: "Too many code execution requests. Please wait a moment before trying again.",
-      keyGenerator: (req) => (req.userId ? `user_${req.userId}` : req.ip || "127.0.0.1"),
+      keyGenerator: (req) => (req.userId ? `user_${req.userId}` : `guest_ip_${req.ip || "127.0.0.1"}`),
       skip: () => isTest,
     });
 
@@ -54,6 +52,7 @@ function createCompilerRouter(options = {}) {
       timeoutMs: config?.judge0TimeoutMs,
       pollIntervalMs: config?.judge0PollIntervalMs,
       maxPollAttempts: config?.judge0MaxPollAttempts,
+      totalTimeoutMs: config?.judge0TotalTimeoutMs,
       useBase64: config?.judge0UseBase64,
     });
 
@@ -67,8 +66,8 @@ function createCompilerRouter(options = {}) {
     activityService: options.activityService,
   });
 
-  router.get("/languages", requireAuth, compilerController.getLanguages);
-  router.post("/run", requireAuth, compilerLimiter, compilerController.runCode);
+  router.get("/languages", optionalAuth, compilerController.getLanguages);
+  router.post("/run", optionalAuth, compilerLimiter, compilerController.runCode);
 
   return router;
 }

@@ -14,9 +14,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('@monaco-editor') || id.includes('monaco-editor')) {
-              return 'monaco-vendor';
-            }
             if (id.includes('lucide-react')) {
               return 'lucide-vendor';
             }

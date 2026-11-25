@@ -119,18 +119,29 @@ describe("Environment Config â€” Unit Tests", () => {
 // concurrently by default; wrapping everything in one async test avoids
 // all races when sessions need to be created/revoked in order.
 
-async function skipIfOffline() {
+async function isServerOnline() {
     try {
         const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(2000) });
-        if (!res.ok) throw new Error("Server unhealthy");
+        if (!res.ok) return false;
+        const body = await res.json().catch(() => ({}));
+        // Verify this is the legacy server (has roomsCount and database === 'connected', not cocode-backend-v2)
+        if (body.service === "cocode-backend-v2" || body.roomsCount === undefined || body.database !== "connected") {
+            return false;
+        }
+        await prisma.$queryRaw`SELECT 1`;
+        return true;
     } catch {
-        console.warn(`\n[SKIP] Server not reachable at ${API_BASE}. Start the server and MySQL to run integration tests.\n`);
-        process.exit(0);
+        return false;
     }
 }
 
-test("Authentication API â€” Integration Tests (sequential)", async () => {
-    await skipIfOffline();
+test("Authentication API — Integration Tests (sequential)", async (t) => {
+    const online = await isServerOnline();
+    if (!online) {
+        console.warn(`\n[SKIP] Server not reachable at ${API_BASE}. Start the server and MySQL to run integration tests.\n`);
+        t.skip(`Server not reachable at ${API_BASE}`);
+        return;
+    }
 
     let localTestUserId = null;
     let localTestToken = null;
@@ -535,6 +546,10 @@ describe("Security Config Assertions â€” Static Checks", () => {
             "session.js must not store raw token in DB"
         );
     });
+});
+
+after(async () => {
+    await prisma.$disconnect().catch(() => {});
 });
 
 console.log("\nâ•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");

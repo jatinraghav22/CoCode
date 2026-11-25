@@ -18,6 +18,7 @@
  */
 
 const { Server } = require("socket.io");
+const { logger } = require("./utils/logger");
 const { verifyAccessToken } = require("./utils/jwt");
 const { roomStateStore } = require("./modules/rooms/room.store");
 
@@ -142,7 +143,7 @@ function createSocketHandler(httpServer, options) {
 
       return next();
     } catch (err) {
-      console.error("Socket.IO auth error:", err.message);
+      logger.error("SOCKET", "Socket.IO auth error:", err);
       return next(new Error("Authentication failed."));
     }
   });
@@ -189,7 +190,7 @@ function createSocketHandler(httpServer, options) {
         const presence = roomStateStore.getPresence(roomCode);
         socket.emit("room:state", { state: snapshot, presence });
       } catch (err) {
-        console.error("room:sync error:", err.message);
+        logger.error("SOCKET", "room:sync error:", err);
         socket.emit("room:error", { message: "Failed to synchronize room state." });
       }
     });
@@ -294,7 +295,7 @@ function createSocketHandler(httpServer, options) {
         room: rawCode,
       });
     } catch (err) {
-      console.error("handleJoin error:", err.message);
+      logger.error("SOCKET", "handleJoin error:", err);
       socket.emit("room:error", { message: "Failed to join room." });
     }
   }
@@ -353,7 +354,7 @@ function createSocketHandler(httpServer, options) {
         sentBy: socket.userId,
       });
     } catch (err) {
-      console.error("handleYjsUpdate error:", err.message);
+      logger.error("SOCKET", "handleYjsUpdate error:", err);
     }
   }
 
@@ -408,7 +409,7 @@ function createSocketHandler(httpServer, options) {
       // Emit legacy event name for backward compatibility
       socket.to(roomCode).emit("code-change", { fileId, content });
     } catch (err) {
-      console.error("handleCodeUpdate error:", err.message);
+      logger.error("SOCKET", "handleCodeUpdate error:", err);
     }
   }
 

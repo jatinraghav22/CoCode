@@ -11,6 +11,7 @@ const { createProjectRouter } = require("./routes/project.routes");
 const { createActivityRouter } = require("./routes/activity.routes");
 const { ActivityService } = require("./modules/activity/activity.service");
 const { ProjectService } = require("./modules/projects/project.service");
+const { logger } = require("./utils/logger");
 
 function createApp(config, dependencies = {}) {
   const app = express();
@@ -33,6 +34,7 @@ function createApp(config, dependencies = {}) {
   }
 
   app.use(helmet());
+  app.use(logger.requestLogger());
 
   app.use(
     cors({
@@ -138,6 +140,7 @@ function createApp(config, dependencies = {}) {
   });
 
   app.use("/api/users", userRouter);
+  app.use("/api/user", userRouter);
 
   const activityService =
     dependencies.activityService || new ActivityService(prisma);
@@ -258,6 +261,10 @@ function createApp(config, dependencies = {}) {
 
     // Prisma: Database connection failure / initialization error
     if (err.name === "PrismaClientInitializationError" || err.code === "P2024") {
+      logger.error("DB", "Database service unreachable", {
+        errorName: err.name,
+        errorCode: err.code,
+      });
       return res.status(503).json({
         success: false,
         error: "Database service is currently unreachable.",
@@ -267,15 +274,13 @@ function createApp(config, dependencies = {}) {
 
     const statusCode = Number(err.status || err.statusCode) || 500;
 
-    // Log diagnostic details on the server safely without leaking tokens, passwords, or hashes
-    const rawMessage = String(err.message || "");
-    const safeLogMessage = rawMessage
-      .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
-      .replace(/"password":\s*"[^"]+"/gi, '"password": "[REDACTED]"')
-      .replace(/passwordHash/gi, "[REDACTED]");
-
+    // Log safe diagnostic metadata only; never log raw exception messages.
     if (statusCode >= 500) {
-      console.error(`Unhandled server error [${statusCode}]:`, safeLogMessage);
+      logger.error("HTTP", `Unhandled server error [${statusCode}]`, {
+        errorName: err.name,
+        errorCode: err.code,
+        statusCode,
+      });
     }
 
     // Only expose client-facing message for known 4xx client errors, never for 5xx internal failures

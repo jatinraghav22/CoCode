@@ -2,6 +2,7 @@ const {
   validateRegisterInput,
   validateLoginInput,
 } = require("../../utils/validation");
+const { logger } = require("../../utils/logger");
 
 class AuthController {
   constructor(authService) {
@@ -48,7 +49,7 @@ class AuthController {
         });
       }
 
-      console.error("Registration error:", error.message);
+      logger.error("AUTH", "Registration error:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error during registration.",
@@ -94,7 +95,7 @@ class AuthController {
       if (typeof next === "function") {
         return next(error);
       }
-      console.error("Login error:", error.message);
+      logger.error("AUTH", "Login error:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error during login.",

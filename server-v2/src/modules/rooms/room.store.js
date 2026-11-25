@@ -1,6 +1,7 @@
 "use strict";
 
 const Y = require("yjs");
+const { logger } = require("../../utils/logger");
 
 /**
  * RoomStateStore — production-grade collaboration state store combining
@@ -142,7 +143,7 @@ class RoomStateStore {
                     : new Uint8Array(doc.yjsState);
                 Y.applyUpdate(yDoc, bytes);
               } catch (e) {
-                console.warn(`Failed to apply binary yjsState for doc ${doc.fileId}, falling back to content:`, e.message);
+                logger.warn("ROOM", `Failed to apply binary yjsState for doc ${doc.fileId}, falling back to content: ${e.message}`);
                 const yText = yDoc.getText("monaco");
                 yText.insert(0, doc.content || "");
               }
@@ -394,7 +395,7 @@ class RoomStateStore {
         }
         file.retryCount = 0;
       } catch (err) {
-        console.error(`Save failed for room ${roomCode} file ${file.fileId}:`, err.message);
+        logger.error("ROOM", `Save failed for room ${roomCode} file ${file.fileId}:`, err);
         file.isDirty = true;
 
         const MAX_RETRIES = 3;
@@ -535,7 +536,7 @@ class RoomStateStore {
           );
           if (hydrationResult.timedOut) {
             timedOut = true;
-            console.error(`Flush deadline expired while awaiting room hydration (${timeoutMs}ms).`);
+            logger.error("ROOM", `Flush deadline expired while awaiting room hydration (${timeoutMs}ms).`);
             for (const [loadingCode] of loadingEntries) {
               addUnsaved({
                 type: "room",
@@ -611,7 +612,7 @@ class RoomStateStore {
         const saveResult = await raceDeadline(Promise.all(savePromises));
         if (saveResult.timedOut) {
           timedOut = true;
-          console.error(`Flush timed out after ${timeoutMs}ms with ${savePromises.length} save(s) outstanding.`);
+          logger.error("ROOM", `Flush timed out after ${timeoutMs}ms with ${savePromises.length} save(s) outstanding.`);
           // Report every file that is still dirty or in-flight
           for (const { roomCode: rCode, file } of saveTargets) {
             if (file.isDirty || file.inFlightSave) {

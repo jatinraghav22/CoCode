@@ -28,6 +28,7 @@ const http = require("http");
 const cors = require("cors");
 const helmet = require("helmet");
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 
@@ -42,16 +43,26 @@ const app = express();
 const server = http.createServer(app);
 
 // ─── Allowed Origins for CORS ─────────────────────────────────────────────────
-// CLIENT_URL can be a comma-separated list for multiple origins.
-// e.g. CLIENT_URL="http://localhost:5173,https://getcocode.vercel.app"
-const rawClientUrl = config.CLIENT_URL || "http://localhost:5173";
-const allowedOrigins = rawClientUrl.split(",").map((o) => o.trim()).filter(Boolean);
+// Default allowed production and development origins
+const DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "https://getcocode.vercel.app",
+    "https://www.getcocode.app",
+    "https://getcocode.app",
+];
+
+const rawClientUrl = config.CLIENT_URL || "";
+const configuredOrigins = rawClientUrl.split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean);
+const allowedOrigins = Array.from(new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins]));
 
 const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+        const normalizedOrigin = origin.trim().replace(/\/+$/, "");
+        if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes("*")) {
             return callback(null, true);
         }
         return callback(new Error(`CORS: Origin "${origin}" is not allowed.`));
@@ -133,14 +144,30 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
 }
 
 function verifyPassword(password, stored) {
-    if (!stored || !stored.includes(":")) return false;
-    const [salt, originalHash] = stored.split(":");
-    const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-    try {
-        return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(originalHash, "hex"));
-    } catch {
-        return false;
+    if (!stored || typeof stored !== "string") return false;
+
+    // 1. Support legacy bcrypt hashes from Phase 1 ($2a$, $2b$, $2y$)
+    if (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$")) {
+        try {
+            return bcrypt.compareSync(password, stored);
+        } catch {
+            return false;
+        }
     }
+
+    // 2. Support scrypt hashes (salt:hash)
+    if (stored.includes(":")) {
+        const [salt, originalHash] = stored.split(":");
+        if (!salt || !originalHash) return false;
+        try {
+            const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+            return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(originalHash, "hex"));
+        } catch {
+            return false;
+        }
+    }
+
+    return false;
 }
 
 // ─── JWT Generation ───────────────────────────────────────────────────────────
@@ -200,17 +227,19 @@ const rooms = new Map(); // roomCode -> room object (for real-time socket state)
 // ─── Periodic Cleanup ─────────────────────────────────────────────────────────
 // Run session cleanup every 24 hours to remove expired/revoked auth session rows.
 // This keeps the AuthSession table lean over time.
-setInterval(async () => {
+const cleanupInterval = setInterval(async () => {
     const deleted = await cleanupExpiredSessions().catch(() => 0);
     if (deleted > 0) {
         console.log(`[session-cleanup] Removed ${deleted} expired/revoked session records.`);
     }
 }, 24 * 60 * 60 * 1000); // 24 hours
+if (cleanupInterval.unref) cleanupInterval.unref();
 
 // Also run once on startup after a short delay (in case of old sessions)
-setTimeout(() => {
+const startupCleanupTimeout = setTimeout(() => {
     cleanupExpiredSessions().catch(() => {});
 }, 10 * 1000);
+if (startupCleanupTimeout.unref) startupCleanupTimeout.unref();
 
 // ============================================================================
 // Public / Health Endpoints
@@ -349,6 +378,23 @@ app.post("/api/auth/register", authRegisterLimiter, async (req, res) => {
         });
     } catch (err) {
         console.error("Registration error:", err.message);
+
+        const isDbError = err.message && (
+            err.message.includes("DATABASE_URL") ||
+            err.message.includes("Can't reach database") ||
+            err.message.includes("database server") ||
+            err.code === "P1001" ||
+            err.code === "P1002" ||
+            err.code === "P1003"
+        );
+
+        if (isDbError) {
+            return res.status(503).json({
+                error: "Database service is temporarily unavailable. Please try again later.",
+                code: "DATABASE_UNAVAILABLE",
+            });
+        }
+
         return res.status(500).json({ error: "Failed to create account. Please try again." });
     }
 });
@@ -388,6 +434,14 @@ app.post("/api/auth/login", authLoginLimiter, async (req, res) => {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
+        // Transparent password upgrade from legacy bcrypt to scrypt
+        if (user.passwordHash && user.passwordHash.startsWith("$2")) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { passwordHash: hashPassword(password) },
+            }).catch(() => {});
+        }
+
         const token = generateToken(user.id);
 
         // Create a tracked session for this login
@@ -415,6 +469,23 @@ app.post("/api/auth/login", authLoginLimiter, async (req, res) => {
         });
     } catch (err) {
         console.error("Login error:", err.message);
+
+        const isDbError = err.message && (
+            err.message.includes("DATABASE_URL") ||
+            err.message.includes("Can't reach database") ||
+            err.message.includes("database server") ||
+            err.code === "P1001" ||
+            err.code === "P1002" ||
+            err.code === "P1003"
+        );
+
+        if (isDbError) {
+            return res.status(503).json({
+                error: "Database service is temporarily unavailable. Please try again later.",
+                code: "DATABASE_UNAVAILABLE",
+            });
+        }
+
         return res.status(500).json({ error: "Failed to log in. Please try again." });
     }
 });
@@ -1328,9 +1399,9 @@ app.post("/api/compiler/run", compilerLimiter, optionalAuth, async (req, res) =>
                     source_code: sourceCode,
                     language_id: languageId,
                     stdin,
-                    cpu_time_limit: 2,
+                    cpu_time_limit: 5,
                     cpu_extra_time: 1,
-                    wall_time_limit: 5,
+                    wall_time_limit: 10,
                     memory_limit: 128000,
                     enable_network: false,
                 }),
@@ -1706,9 +1777,19 @@ io.on("connection", (socket) => {
 // Start Server
 // ============================================================================
 
-server.listen(PORT, () => {
-    console.log(`CoCode backend API running at http://localhost:${PORT}`);
-    console.log(`Environment: ${config.NODE_ENV}`);
-    console.log(`Database connected via Prisma ORM (MySQL)`);
-    console.log(`CORS allowed origins: ${allowedOrigins.join(", ")}`);
-});
+if (require.main === module) {
+    server.listen(PORT, () => {
+        console.log(`CoCode backend API running at http://localhost:${PORT}`);
+        console.log(`Environment: ${config.NODE_ENV}`);
+        console.log(`Database connected via Prisma ORM (MySQL)`);
+        console.log(`CORS allowed origins: ${allowedOrigins.join(", ")}`);
+    });
+}
+
+module.exports = {
+    app,
+    server,
+    hashPassword,
+    verifyPassword,
+    allowedOrigins,
+};

@@ -103,3 +103,208 @@ test("Frontend — Error boundary captures error and formats technical details s
   assert.match(crashedState.error.message, /getModel/);
   assert.ok(crashedState.errorInfo.componentStack.includes("EditorComponent"));
 });
+
+import {
+  profileExtrasKey,
+  readProfileExtras,
+  saveProfileExtras,
+  mergeUserWithProfileExtras,
+} from "../src/profileStorage.js";
+
+test("Frontend — profile extras are isolated between accounts", () => {
+  const store = new Map();
+
+  const storage = {
+    getItem: (key) => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, value),
+  };
+
+  saveProfileExtras("user-1", { username: "first-user" }, storage);
+  saveProfileExtras("user-2", { username: "second-user" }, storage);
+
+  assert.equal(readProfileExtras("user-1", storage).username, "first-user");
+  assert.equal(readProfileExtras("user-2", storage).username, "second-user");
+  assert.notEqual(profileExtrasKey("user-1"), profileExtrasKey("user-2"));
+});
+
+test("Frontend — new accounts do not inherit another account's profile", () => {
+  const store = new Map();
+
+  const storage = {
+    getItem: (key) => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, value),
+  };
+
+  saveProfileExtras("existing-user", { bio: "Private profile" }, storage);
+
+  const newUser = mergeUserWithProfileExtras(
+    { id: "new-user", name: "New User", email: "new@example.com" },
+    storage
+  );
+
+  assert.equal(newUser.bio, undefined);
+  assert.equal(newUser.name, "New User");
+  assert.equal(newUser.email, "new@example.com");
+});
+
+test("Frontend — profile extras cannot override server-owned identity fields", () => {
+  const store = new Map();
+
+  const storage = {
+    getItem: (key) => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, value),
+  };
+
+  saveProfileExtras("user-1", {
+    name: "Incorrect Name",
+    email: "wrong@example.com",
+    username: "correct-username",
+  }, storage);
+
+  const user = mergeUserWithProfileExtras({
+    id: "user-1",
+    name: "Server Name",
+    email: "server@example.com",
+  }, storage);
+
+  assert.equal(user.name, "Server Name");
+  assert.equal(user.email, "server@example.com");
+  assert.equal(user.username, "correct-username");
+});
+
+test("Frontend — profile extras validates structures and handles malformed JSON and quota errors", () => {
+  const store = new Map();
+
+  const storage = {
+    getItem: (key) => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => {
+      if (key.includes("quota-exceeded")) throw new Error("QuotaExceededError");
+      store.set(key, value);
+    },
+  };
+
+  // Validates skills array and socialLinks object
+  saveProfileExtras("user-validation", {
+    username: "valid-user",
+    skills: ["JavaScript", "Python", 123, null],
+    socialLinks: { github: "octocat", linkedin: "developer", invalid: 456 },
+    arbitraryField: "should_be_stripped",
+  }, storage);
+
+  const extras = readProfileExtras("user-validation", storage);
+  assert.equal(extras.username, "valid-user");
+  assert.deepEqual(extras.skills, ["JavaScript", "Python"]);
+  assert.deepEqual(extras.socialLinks, { github: "octocat", linkedin: "developer" });
+  assert.equal(extras.arbitraryField, undefined);
+
+  // Quota error handled safely
+  const saveResult = saveProfileExtras("quota-exceeded", { bio: "large bio" }, storage);
+  assert.equal(saveResult, false);
+
+  // Malformed JSON handled safely
+  store.set(profileExtrasKey("malformed-user"), "{ invalid json ");
+  const malformedExtras = readProfileExtras("malformed-user", storage);
+  assert.deepEqual(malformedExtras, {});
+});
+
+// ── 8. Project Management Operations ─────────────────────────────────────────
+test("Frontend — Project creation, duplication and rename validation", () => {
+  const validateProjectName = (name) => {
+    if (typeof name !== "string") return false;
+    const trimmed = name.trim();
+    return trimmed.length >= 1 && trimmed.length <= 100;
+  };
+
+  assert.equal(validateProjectName(""), false);
+  assert.equal(validateProjectName("   "), false);
+  assert.equal(validateProjectName("My Awesome Project"), true);
+  assert.equal(validateProjectName("a".repeat(101)), false);
+
+  const buildDuplicateName = (original) => `${original} (Copy)`;
+  assert.equal(buildDuplicateName("Algorithms"), "Algorithms (Copy)");
+});
+
+// ── 9. Guest Compiler Access Headers Helper ──────────────────────────────────
+test("Frontend — Guest compiler execution does not include Authorization header, while auth does", () => {
+  const buildCompilerHeaders = (authToken) => {
+    const headers = { "Content-Type": "application/json" };
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
+    return headers;
+  };
+
+  const guestHeaders = buildCompilerHeaders(null);
+  assert.equal(guestHeaders["Authorization"], undefined);
+  assert.equal(guestHeaders["Content-Type"], "application/json");
+
+  const authHeaders = buildCompilerHeaders("jwt_valid_token");
+  assert.equal(authHeaders["Authorization"], "Bearer jwt_valid_token");
+});
+
+// ── 10. Room Code Validation Helper ──────────────────────────────────────────
+test("Frontend — Room code normalization and validation", () => {
+  const sanitizeRoomCode = (code) => {
+    if (typeof code !== "string") return "";
+    return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  };
+
+  const isValidRoomCode = (code) => /^[A-Z0-9]{6}$/.test(code);
+
+  assert.equal(sanitizeRoomCode("abc123"), "ABC123");
+  assert.equal(sanitizeRoomCode("  x-y-z 4 5 6  "), "XYZ456");
+  assert.equal(isValidRoomCode("ABC123"), true);
+  assert.equal(isValidRoomCode("AB12"), false);
+  assert.equal(isValidRoomCode("ABCDEF78"), false);
+});
+
+// ── 11. Editor Debounced Autosave Orchestration ──────────────────────────────
+test("Frontend — Debounced autosave timer lifecycle", () => {
+  const timers = new Map();
+  let saveCount = 0;
+
+  const scheduleAutosave = (fileId, delay, saveFn) => {
+    if (timers.has(fileId)) {
+      clearTimeout(timers.get(fileId));
+    }
+    const timerId = setTimeout(() => {
+      timers.delete(fileId);
+      saveFn();
+    }, delay);
+    timers.set(fileId, timerId);
+  };
+
+  const cancelAutosave = (fileId) => {
+    if (timers.has(fileId)) {
+      clearTimeout(timers.get(fileId));
+      timers.delete(fileId);
+    }
+  };
+
+  scheduleAutosave("file-1", 50, () => { saveCount++; });
+  assert.equal(timers.has("file-1"), true);
+  // Manual save cancels pending timer
+  cancelAutosave("file-1");
+  assert.equal(timers.has("file-1"), false);
+  assert.equal(saveCount, 0);
+});
+
+// ── 12. Compiler Execution Status & Content Resolution ───────────────────────
+test("Frontend — Compiler status classification treats Accepted as success and TLE as failure", () => {
+  const isExecutionSuccess = (data) => {
+    const statusText = data.status || "Finished";
+    return (
+      statusText === "Accepted" ||
+      statusText === "Finished" ||
+      (!data.status && !data.stderr && !data.compileOutput)
+    );
+  };
+
+  assert.equal(isExecutionSuccess({ status: "Accepted", stdout: "Hello\n", stderr: "", compileOutput: "" }), true);
+  assert.equal(isExecutionSuccess({ status: "Finished", stdout: "Hello\n", stderr: "", compileOutput: "" }), true);
+  assert.equal(isExecutionSuccess({ status: "Time Limit Exceeded", stdout: "", stderr: "", compileOutput: "" }), false);
+  assert.equal(isExecutionSuccess({ status: "Compilation Error", stdout: "", stderr: "", compileOutput: "err" }), false);
+  assert.equal(isExecutionSuccess({ status: "Runtime Error (NZEC)", stdout: "", stderr: "Traceback", compileOutput: "" }), false);
+});
+
+

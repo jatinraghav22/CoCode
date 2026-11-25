@@ -1,5 +1,7 @@
 "use strict";
 
+const { logger } = require("../../utils/logger");
+
 /**
  * DashboardService — aggregates user-scoped statistics and activity.
  *
@@ -112,7 +114,7 @@ class DashboardService {
         });
       }
     } catch (roomErr) {
-      console.warn("Failed to query active rooms for dashboard:", roomErr.message);
+      logger.warn("DASHBOARD", "Failed to query active rooms for dashboard:", roomErr);
       activeRoomsCount = 0;
     }
 
@@ -125,7 +127,7 @@ class DashboardService {
         });
       }
     } catch (projErr) {
-      console.warn("Failed to query total projects for dashboard:", projErr.message);
+      logger.warn("DASHBOARD", "Failed to query total projects for dashboard:", projErr);
       totalProjects = 0;
     }
 
@@ -159,7 +161,7 @@ class DashboardService {
         });
       }
     } catch (recErr) {
-      console.warn("Failed to query recent projects for dashboard:", recErr.message);
+      logger.warn("DASHBOARD", "Failed to query recent projects for dashboard:", recErr);
       recentProjects = [];
     }
 
@@ -208,7 +210,7 @@ class DashboardService {
         }));
       }
     } catch (actErr) {
-      console.warn("Failed to query activities for dashboard:", actErr.message);
+      logger.warn("DASHBOARD", "Failed to query activities for dashboard:", actErr);
       todayActivityMinutes = 0;
       recentActivities = [];
     }

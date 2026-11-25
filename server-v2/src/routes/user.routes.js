@@ -47,8 +47,13 @@ function createUserRouter(options) {
     });
 
   router.get("/me", requireAuth, userController.getProfile);
+  router.get("/profile", requireAuth, userController.getProfile);
   router.patch("/me", requireAuth, userController.updateProfile);
+  router.put("/me", requireAuth, userController.updateProfile);
+  router.patch("/profile", requireAuth, userController.updateProfile);
+  router.put("/profile", requireAuth, userController.updateProfile);
   router.patch("/me/password", requireAuth, passwordLimiter, userController.changePassword);
+  router.put("/me/password", requireAuth, passwordLimiter, userController.changePassword);
 
   return router;
 }

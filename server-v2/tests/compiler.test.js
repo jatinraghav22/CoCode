@@ -240,7 +240,8 @@ test("Judge0Service - handles synchronous submission response (immediate result)
     assert.match(url, /\/submissions/);
     const body = JSON.parse(options.body);
     assert.equal(body.language_id, 100);
-    assert.equal(body.cpu_time_limit, 2);
+    assert.equal(body.cpu_time_limit, 5);
+    assert.equal(body.wall_time_limit, 10);
     assert.equal(body.enable_network, false);
 
     return createMockStream({
@@ -265,6 +266,49 @@ test("Judge0Service - handles synchronous submission response (immediate result)
   assert.equal(result.stderr, null);
   assert.equal(result.time, "0.021");
   assert.equal(result.memory, 3200);
+});
+
+test("Judge0Service - allows normal Python startup time above the previous 2-second CPU limit", async () => {
+  let callCount = 0;
+  const mockFetch = async (url, options) => {
+    callCount += 1;
+    if (callCount === 1) {
+      const body = JSON.parse(options.body);
+      assert.equal(body.language_id, 100);
+      assert.equal(body.source_code, Buffer.from('print("Hello")').toString("base64"));
+      assert.equal(body.cpu_time_limit, 5);
+      assert.equal(body.cpu_extra_time, 1);
+      assert.equal(body.wall_time_limit, 10);
+      assert.equal(body.memory_limit, 128000);
+      assert.equal(body.enable_network, false);
+      return createMockStream({ token: "python-startup-token" }, 201);
+    }
+
+    return createMockStream({
+      status: { id: 3, description: "Accepted" },
+      stdout: Buffer.from("Hello\n").toString("base64"),
+      stderr: null,
+      compile_output: null,
+      message: null,
+      time: "3.098",
+      memory: 51928,
+    });
+  };
+
+  const service = new Judge0Service({
+    fetchFn: mockFetch,
+    sleepFn: async () => {},
+    useBase64: true,
+  });
+  const result = await service.execute({
+    languageId: 100,
+    sourceCode: 'print("Hello")',
+  });
+
+  assert.equal(result.status.id, 3);
+  assert.equal(result.stdout, "Hello\n");
+  assert.equal(result.time, "3.098");
+  assert.equal(result.memory, 51928);
 });
 
 test("Judge0Service - handles asynchronous polling with completion", async () => {

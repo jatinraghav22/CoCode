@@ -9,7 +9,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/socket.js && node --check src/config/env.js && node --check src/config/prisma.js && node --check src/config/languages.js && node --check src/utils/jwt.js && node --check src/utils/validation.js && node --check src/middleware/rateLimiter.js && node --check src/middleware/auth.js && node --check src/modules/auth/auth.service.js && node --check src/modules/auth/auth.controller.js && node --check src/routes/auth.routes.js && node --check src/modules/users/user.service.js && node --check src/modules/users/user.controller.js && node --check src/routes/user.routes.js && node --check src/modules/compiler/compiler.validation.js && node --check src/modules/compiler/judge0.service.js && node --check src/modules/compiler/compiler.service.js && node --check src/modules/compiler/compiler.controller.js && node --check src/routes/compiler.routes.js && node --check src/modules/rooms/room.service.js && node --check src/modules/rooms/room.controller.js && node --check src/modules/rooms/room.store.js && node --check src/routes/room.routes.js && node --check src/modules/projects/project.service.js && node --check src/modules/projects/project.controller.js && node --check src/routes/project.routes.js && node --check src/modules/activity/activity.service.js && node --check src/modules/activity/activity.controller.js && node --check src/routes/activity.routes.js && node --check src/modules/dashboard/dashboard.service.js && node --check src/modules/dashboard/dashboard.controller.js && node --check src/routes/dashboard.routes.js"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/socket.js && node --check src/config/env.js && node --check src/config/prisma.js && node --check src/config/languages.js && node --check src/utils/jwt.js && node --check src/utils/validation.js && node --check src/utils/logger.js && node --check src/middleware/rateLimiter.js && node --check src/middleware/auth.js && node --check src/modules/auth/auth.service.js && node --check src/modules/auth/auth.controller.js && node --check src/routes/auth.routes.js && node --check src/modules/users/user.service.js && node --check src/modules/users/user.controller.js && node --check src/routes/user.routes.js && node --check src/modules/compiler/compiler.validation.js && node --check src/modules/compiler/judge0.service.js && node --check src/modules/compiler/compiler.service.js && node --check src/modules/compiler/compiler.controller.js && node --check src/routes/compiler.routes.js && node --check src/modules/rooms/room.service.js && node --check src/modules/rooms/room.controller.js && node --check src/modules/rooms/room.store.js && node --check src/routes/room.routes.js && node --check src/modules/projects/project.service.js && node --check src/modules/projects/project.controller.js && node --check src/routes/project.routes.js && node --check src/modules/activity/activity.service.js && node --check src/modules/activity/activity.controller.js && node --check src/routes/activity.routes.js && node --check src/modules/dashboard/dashboard.service.js && node --check src/modules/dashboard/dashboard.controller.js && node --check src/routes/dashboard.routes.js"
   },
   "engines": {
     "node": ">=20"
@@ -33,5 +33,13 @@
     "prisma@6.19.3": true,
     "@prisma/engines@6.19.3": true,
     "@prisma/client@6.19.3": true
+  },
+  "overrides": {
+    "prisma": {
+      "@prisma/config": {
+        "effect": "3.22.1",
+        "deepmerge-ts": "8.0.0"
+      }
+    }
   }
 }

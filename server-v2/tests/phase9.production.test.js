@@ -616,10 +616,10 @@ test("PHASE 9 — Judge0 constructor validates timeout bounds", async () => {
   assert.equal(s3.pollIntervalMs, 750);
 
   const s4 = new Judge0Service({ maxPollAttempts: 100 });
-  assert.equal(s4.maxPollAttempts, 15);
+  assert.equal(s4.maxPollAttempts, 25);
 
   const s5 = new Judge0Service({ totalTimeoutMs: 500 });
-  assert.equal(s5.totalTimeoutMs, 15000);
+  assert.equal(s5.totalTimeoutMs, 25000);
 
   const s6 = new Judge0Service({ timeoutMs: 5000, pollIntervalMs: 500, maxPollAttempts: 10, totalTimeoutMs: 8000 });
   assert.equal(s6.timeoutMs, 5000);
