@@ -81,6 +81,7 @@ test("Logger — request logs exclude query parameters", () => {
   const output = [];
 
   const logger = new Logger({
+    isTest: false,
     outputFn: (message) => output.push(message),
     errorFn: (message) => output.push(message),
   });

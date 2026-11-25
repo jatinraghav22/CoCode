@@ -79,7 +79,9 @@ function sanitizeValue(value, depth = 0) {
 
 class Logger {
   constructor(options = {}) {
-    this.isTest = (process.env.NODE_ENV === "test" && !process.env.TEST_LOGS);
+    this.isTest = options.isTest !== undefined
+      ? Boolean(options.isTest)
+      : (process.env.NODE_ENV === "test" && !process.env.TEST_LOGS);
     this.outputFn = options.outputFn || console.log;
     this.errorFn = options.errorFn || console.error;
   }

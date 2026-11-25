@@ -212,11 +212,6 @@ export function AuthProvider({ children }) {
     return null;
   }
 
-  // Quick helper for demo testing
-  async function demoLogin() {
-    return login("demo@cocode.dev", "password123");
-  }
-
   const value = {
     user,
     token,
@@ -228,7 +223,6 @@ export function AuthProvider({ children }) {
     logoutAll,
     updateProfile,
     refreshProfile,
-    demoLogin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

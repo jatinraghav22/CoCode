@@ -6,7 +6,6 @@ import {
     Code2,
     Eye,
     EyeOff,
-    KeyRound,
     LoaderCircle,
     LockKeyhole,
     Mail,
@@ -14,7 +13,6 @@ import {
     Sparkles,
     Terminal,
     UsersRound,
-    Zap,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
@@ -32,7 +30,7 @@ function AuthBrand() {
 }
 
 export default function Login() {
-    const { login, demoLogin, isAuthenticated } = useAuth();
+    const { login, isAuthenticated } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -66,25 +64,6 @@ export default function Login() {
         } else {
             setMessage(result.error);
         }
-    }
-
-    async function handleDemoLogin() {
-        setMessage("");
-        setIsSubmitting(true);
-        const result = await demoLogin();
-        setIsSubmitting(false);
-
-        if (result.success) {
-            navigate(redirectDestination, { replace: true });
-        } else {
-            setMessage(result.error);
-        }
-    }
-
-    function handleAutoFillDemo() {
-        setEmail("demo@cocode.dev");
-        setPassword("password123");
-        setMessage("Demo credentials entered. Click 'Sign In' or 'Quick Demo Login'.");
     }
 
     return (
@@ -179,69 +158,6 @@ export default function Login() {
                         </p>
                     </div>
 
-                    {/* Quick Demo Access Card */}
-                    <div
-                        style={{
-                            background: "rgba(139, 92, 246, 0.12)",
-                            border: "1px solid rgba(139, 92, 246, 0.35)",
-                            borderRadius: 12,
-                            padding: "16px 18px",
-                            marginBottom: 20,
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 10,
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#c4b5fd", display: "flex", alignItems: "center", gap: 6 }}>
-                                <Zap size={15} color="#06b6d4" />
-                                Instant Demo Login
-                            </span>
-                            <button
-                                type="button"
-                                onClick={handleAutoFillDemo}
-                                style={{
-                                    fontSize: "0.75rem",
-                                    color: "#56e4ff",
-                                    textDecoration: "underline",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                }}
-                            >
-                                Auto-fill fields
-                            </button>
-                        </div>
-                        <div style={{ fontSize: "0.8rem", color: "#cbd5e1", lineHeight: 1.5 }}>
-                            <strong>Email:</strong> <code>demo@cocode.dev</code> <br />
-                            <strong>Password:</strong> <code>password123</code>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleDemoLogin}
-                            disabled={isSubmitting}
-                            style={{
-                                background: "linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)",
-                                color: "#ffffff",
-                                border: "none",
-                                borderRadius: 8,
-                                padding: "8px 14px",
-                                fontSize: "0.85rem",
-                                fontWeight: 700,
-                                cursor: isSubmitting ? "not-allowed" : "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 8,
-                                boxShadow: "0 0 16px rgba(139, 92, 246, 0.35)",
-                            }}
-                        >
-                            {isSubmitting ? <LoaderCircle size={15} style={{ animation: "spin 1s linear infinite" }} /> : <KeyRound size={15} />}
-                            <span>One-Click Demo Sign In</span>
-                        </button>
-                    </div>
-
                     <form className="auth-form" onSubmit={handleSubmit}>
                         <div className="auth-field">
                             <label htmlFor="login-email">Email address</label>
@@ -251,7 +167,7 @@ export default function Login() {
                                     id="login-email"
                                     type="email"
                                     autoComplete="email"
-                                    placeholder="demo@cocode.dev"
+                                    placeholder="you@example.com"
                                     value={email}
                                     onChange={(event) => {
                                         setEmail(event.target.value);
@@ -304,7 +220,7 @@ export default function Login() {
                                 type="button"
                                 onClick={() =>
                                     setMessage(
-                                        "For demo testing, use demo@cocode.dev / password123, or create a new account."
+                                        "Password reset is currently unavailable. Please contact support or create a new account."
                                     )
                                 }
                             >
@@ -328,7 +244,7 @@ export default function Login() {
 
                         {message && (
                             <div className="auth-feedback" role="status">
-                                {message.includes("entered") || message.includes("successful") ? (
+                                {message.includes("successful") ? (
                                     <CheckCircle2 size={16} style={{ color: "#10b981" }} />
                                 ) : (
                                     <ShieldCheck size={16} style={{ color: "#f43f5e" }} />
