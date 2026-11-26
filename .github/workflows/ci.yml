@@ -23,13 +23,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 26
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 26.13.1
+          cache: npm
           cache-dependency-path: |
             client/package-lock.json
             server-v2/package-lock.json
+
+      - name: Verify Node and npm versions
+        run: |
+          node --version
+          npm --version
 
       # ─── Client Dependencies & Verification ───────────────────────────────
       - name: Install Client dependencies
