@@ -578,7 +578,7 @@ class RoomStateStore {
     // record all dirty files as unsaved immediately.
     // Otherwise, attempt to execute and await saves under remaining deadline.
     const remainingTime = deadline - Date.now();
-    if (remainingTime <= 0 && saveTargets.length > 0) {
+    if ((timedOut || remainingTime <= 0) && saveTargets.length > 0) {
       timedOut = true;
       for (const { roomCode: rCode, file } of saveTargets) {
         addUnsaved({
