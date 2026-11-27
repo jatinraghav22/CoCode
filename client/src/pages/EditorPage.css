@@ -85,6 +85,55 @@
   gap: 8px;
 }
 
+.ide-room-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid #1e293b;
+}
+
+.ide-room-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.ide-room-nav-tab:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.ide-room-nav-tab.active {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+}
+
+.ide-room-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .ide-topbar-right {
   display: flex;
   align-items: center;

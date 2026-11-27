@@ -125,6 +125,10 @@ class RoomStateStore {
         const roomData = {
           code: normalized,
           files: new Map(),
+          whiteboard: {
+            elements: new Map(),
+            updatedAt: Date.now(),
+          },
         };
 
         // Re-hydrate persistent documents from TiDB Cloud if roomService is available
@@ -213,7 +217,11 @@ class RoomStateStore {
   _getOrCreateFile(roomCode, fileId, initialContent = "", language = "javascript", filename = null) {
     const normalized = roomCode.toUpperCase();
     if (!this._rooms.has(normalized)) {
-      this._rooms.set(normalized, { code: normalized, files: new Map() });
+      this._rooms.set(normalized, {
+        code: normalized,
+        files: new Map(),
+        whiteboard: { elements: new Map(), updatedAt: Date.now() },
+      });
     }
     const room = this._rooms.get(normalized);
 
@@ -458,6 +466,87 @@ class RoomStateStore {
     const normalized = roomCode.toUpperCase();
     if (!this._rooms.has(normalized)) return null;
     return this._rooms.get(normalized).files.get(fileId) || null;
+  }
+
+  // ─── Isolated Room Whiteboard State ────────────────────────────────────────
+
+  _ensureWhiteboard(roomCode) {
+    const normalized = roomCode.toUpperCase();
+    if (!this._rooms.has(normalized)) {
+      this._rooms.set(normalized, {
+        code: normalized,
+        files: new Map(),
+        whiteboard: { elements: new Map(), updatedAt: Date.now() },
+      });
+    }
+    const room = this._rooms.get(normalized);
+    if (!room.whiteboard) {
+      room.whiteboard = { elements: new Map(), updatedAt: Date.now() };
+    }
+    return room.whiteboard;
+  }
+
+  /**
+   * Upserts a validated whiteboard element into the room's isolated whiteboard state.
+   *
+   * @param {string} roomCode
+   * @param {Object} element
+   * @param {number} [maxElements=2000]
+   * @returns {{ ok: true, element: Object } | { ok: false, error: string }}
+   */
+  upsertWhiteboardElement(roomCode, element, maxElements = 2000) {
+    if (this._isShuttingDown) {
+      return { ok: false, error: "Server is shutting down; whiteboard writes rejected." };
+    }
+    const wb = this._ensureWhiteboard(roomCode);
+    if (!wb.elements.has(element.id) && wb.elements.size >= maxElements) {
+      return { ok: false, error: "Whiteboard element limit reached. Please clear the canvas." };
+    }
+    wb.elements.set(element.id, element);
+    wb.updatedAt = Date.now();
+    return { ok: true, element };
+  }
+
+  /**
+   * Deletes a whiteboard element by ID from the room's whiteboard state.
+   *
+   * @param {string} roomCode
+   * @param {string} elementId
+   * @returns {boolean}
+   */
+  deleteWhiteboardElement(roomCode, elementId) {
+    if (this._isShuttingDown) return false;
+    const wb = this._ensureWhiteboard(roomCode);
+    const deleted = wb.elements.delete(elementId);
+    if (deleted) {
+      wb.updatedAt = Date.now();
+    }
+    return deleted;
+  }
+
+  /**
+   * Clears all whiteboard elements for a specific room.
+   *
+   * @param {string} roomCode
+   */
+  clearWhiteboard(roomCode) {
+    if (this._isShuttingDown) return;
+    const wb = this._ensureWhiteboard(roomCode);
+    wb.elements.clear();
+    wb.updatedAt = Date.now();
+  }
+
+  /**
+   * Returns all whiteboard elements for a room in insertion order.
+   *
+   * @param {string} roomCode
+   * @returns {Array<Object>}
+   */
+  getWhiteboardElements(roomCode) {
+    const normalized = roomCode.toUpperCase();
+    const room = this._rooms.get(normalized);
+    if (!room || !room.whiteboard) return [];
+    return Array.from(room.whiteboard.elements.values());
   }
 
   /**

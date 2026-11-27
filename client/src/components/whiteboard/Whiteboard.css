@@ -1,0 +1,288 @@
+/* ============================================================================
+   CoCode Collaborative Whiteboard Styling
+   Matches CoCode dark IDE aesthetic with responsive desktop/tablet/mobile support.
+   ============================================================================ */
+
+.wb-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: #090d16;
+  color: #e2e8f0;
+  overflow: hidden;
+}
+
+.wb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #0d1320;
+  border-bottom: 1px solid #1e293b;
+  z-index: 5;
+}
+
+.wb-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wb-divider {
+  width: 1px;
+  height: 22px;
+  background: #1e293b;
+  margin: 0 2px;
+}
+
+.wb-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: rgba(30, 41, 59, 0.45);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.wb-tool-btn:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.75);
+  color: #f8fafc;
+}
+
+.wb-tool-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #38bdf8;
+}
+
+.wb-tool-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wb-tool-btn.wb-btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+}
+
+.wb-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.wb-color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.wb-color-swatch.active {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+  transform: scale(1.12);
+}
+
+.wb-custom-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.wb-custom-color input[type="color"] {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.wb-size-group {
+  gap: 5px;
+}
+
+.wb-size-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: rgba(30, 41, 59, 0.4);
+  cursor: pointer;
+}
+
+.wb-size-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.wb-size-dot {
+  display: block;
+  border-radius: 50%;
+  background: #e2e8f0;
+}
+
+.wb-size-slider {
+  width: 68px;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+.wb-size-label {
+  font-size: 11px;
+  color: #94a3b8;
+  min-width: 30px;
+}
+
+.wb-sync-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wb-sync-pill.online {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.wb-sync-pill.offline {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.wb-stage-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #070b13;
+  overflow: hidden;
+}
+
+.wb-canvas-stage {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  border: 1px solid #1e293b;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.wb-canvas-stage.theme-dark {
+  background-color: #0b1120;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.wb-canvas-stage.theme-light {
+  background-color: #ffffff;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.1) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.wb-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.wb-canvas.tool-select {
+  cursor: default;
+}
+
+.wb-canvas.tool-text {
+  cursor: text;
+}
+
+.wb-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+
+.wb-text-overlay {
+  position: absolute;
+  z-index: 10;
+  min-width: 160px;
+  max-width: 320px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px dashed #38bdf8;
+  background: rgba(15, 23, 42, 0.88);
+  outline: none;
+  resize: none;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+}
+
+.wb-canvas-stage.theme-light .wb-text-overlay {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 768px) {
+  .wb-toolbar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .wb-divider {
+    display: none;
+  }
+
+  .wb-size-slider,
+  .wb-size-label,
+  .wb-btn-text {
+    display: none;
+  }
+
+  .wb-stage-wrapper {
+    padding: 6px;
+  }
+}

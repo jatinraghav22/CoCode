@@ -43,6 +43,7 @@ import {
   Check,
   Save,
   ChevronRight,
+  PenTool,
 } from "lucide-react";
 import { useAuth } from "../AuthContext.jsx";
 import { API_BASE } from "../config/api.js";
@@ -52,6 +53,7 @@ import CommandPalette from "../components/ide/CommandPalette.jsx";
 import QuickOpen from "../components/ide/QuickOpen.jsx";
 import TerminalConsole from "../components/ide/TerminalConsole.jsx";
 import ConfirmModal from "../components/ide/ConfirmModal.jsx";
+import Whiteboard from "../components/whiteboard/Whiteboard.jsx";
 import "./EditorPage.css";
 
 const RUNNABLE_LANGUAGES = new Set([
@@ -133,6 +135,8 @@ export default function EditorPage() {
 
   // Active activity bar tab: files | search | history | run | chat | analytics | teams | settings | devtools
   const [activeActivityTab, setActiveActivityTab] = useState("files");
+  const [workspaceMode, setWorkspaceMode] = useState("code"); // "code" | "whiteboard"
+  const [socketInstance, setSocketInstance] = useState(null);
 
   // Files & Folders state
   const projectStorageKey = useMemo(() => `cocode-ide-files-${roomId || projectId || "default"}`, [roomId, projectId]);
@@ -386,6 +390,7 @@ export default function EditorPage() {
         reconnectionDelay: 1000,
       });
       socketRef.current = socket;
+      setSocketInstance(socket);
 
       socket.on("connect", () => {
         setConnectionStatus("connected");
@@ -626,6 +631,7 @@ export default function EditorPage() {
         socket.off("chat:message", handleIncomingChatMessage);
         socket.off("chat-message", handleIncomingChatMessage);
         socket.disconnect();
+        setSocketInstance(null);
       };
     } catch (err) {
       console.warn("Socket.IO connection failed:", err);
@@ -2056,12 +2062,50 @@ export default function EditorPage() {
         </div>
 
         <div className="ide-topbar-center">
+          <div className="ide-room-nav" role="tablist" aria-label="Room workspace navigation">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceMode === "code"}
+              className={`ide-room-nav-tab ${workspaceMode === "code" ? "active" : ""}`}
+              onClick={() => setWorkspaceMode("code")}
+              title="Code Editor"
+            >
+              <FileCode size={13} />
+              <span>Code Editor</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeActivityTab === "chat"}
+              className={`ide-room-nav-tab ${activeActivityTab === "chat" ? "active" : ""}`}
+              onClick={() => setActiveActivityTab(activeActivityTab === "chat" ? null : "chat")}
+              title="Room Chat"
+            >
+              <MessageSquare size={13} />
+              <span>Chat</span>
+              {chatMessages.length > 1 && (
+                <span className="ide-room-nav-badge">{chatMessages.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceMode === "whiteboard"}
+              className={`ide-room-nav-tab ${workspaceMode === "whiteboard" ? "active" : ""}`}
+              onClick={() => setWorkspaceMode("whiteboard")}
+              title="Collaborative Whiteboard"
+            >
+              <PenTool size={13} />
+              <span>Whiteboard</span>
+            </button>
+          </div>
           {projectData && (
             <span style={{ fontSize: "12px", color: "#818cf8", fontWeight: 600, marginRight: "8px" }}>
               {projectData.name} /
             </span>
           )}
-          {activeFile && (
+          {activeFile && workspaceMode === "code" && (
             <div className="ide-project-title-badge">
               {renderLanguageBadge(activeFile.language)}
               <span>{activeFile.name}</span>
@@ -2256,6 +2300,14 @@ export default function EditorPage() {
             >
               <Users size={20} />
               <span className="badge-counter">{collaborators.length}</span>
+            </button>
+            <button
+              className={`ide-activity-btn ${workspaceMode === "whiteboard" ? "active" : ""}`}
+              onClick={() => setWorkspaceMode((cur) => (cur === "whiteboard" ? "code" : "whiteboard"))}
+              title="Collaborative Whiteboard"
+              aria-label="Toggle Whiteboard"
+            >
+              <PenTool size={20} />
             </button>
           </div>
 
@@ -2795,6 +2847,31 @@ export default function EditorPage() {
             Main Surface (Tabs + Monaco + Floating Pill + Resizable Bottom Drawer)
         ====================================================================== */}
         <main className="ide-main-surface">
+          <div
+            style={{
+              display: workspaceMode === "whiteboard" ? "flex" : "none",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            <Whiteboard
+              socket={socketInstance}
+              roomId={roomId}
+              user={user}
+              connectionStatus={connectionStatus}
+              onToast={showToast}
+            />
+          </div>
+
+          <div
+            style={{
+              display: workspaceMode === "code" ? "flex" : "none",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
           {/* Multi-Tab Bar (Phase 8.3) */}
           <div className="ide-tabs-bar">
             {openTabIds.map((tabId) => {
@@ -3126,6 +3203,7 @@ export default function EditorPage() {
               </div>
             )}
           </section>
+          </div>
         </main>
       </div>
 

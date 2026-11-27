@@ -21,6 +21,11 @@ const { Server } = require("socket.io");
 const { logger } = require("./utils/logger");
 const { verifyAccessToken } = require("./utils/jwt");
 const { roomStateStore } = require("./modules/rooms/room.store");
+const {
+  MAX_ELEMENTS_PER_ROOM,
+  validateWhiteboardElement,
+  isValidElementId,
+} = require("./modules/rooms/whiteboard.validation");
 
 /** Maximum allowed plain text code payload: 200 KB. */
 const MAX_CODE_BYTES = 200 * 1024;
@@ -214,6 +219,14 @@ function createSocketHandler(httpServer, options) {
       handleChat(io, socket, text, true, clientMsgId);
     });
 
+    // ── whiteboard:* (Isolated real-time collaborative whiteboard) ─────────
+    socket.on("whiteboard:sync", () => handleWhiteboardSync(socket));
+    socket.on("whiteboard:element:add", (payload) => handleWhiteboardUpsert(socket, payload, "whiteboard:element:add"));
+    socket.on("whiteboard:element:update", (payload) => handleWhiteboardUpsert(socket, payload, "whiteboard:element:update"));
+    socket.on("whiteboard:element:delete", (payload) => handleWhiteboardDelete(socket, payload));
+    socket.on("whiteboard:preview", (payload) => handleWhiteboardPreview(socket, payload));
+    socket.on("whiteboard:clear", () => handleWhiteboardClear(socket));
+
     // ── disconnect ─────────────────────────────────────────────────────────
     socket.on("disconnect", () => {
       if (socket.currentRoom) {
@@ -274,6 +287,12 @@ function createSocketHandler(httpServer, options) {
 
       // Send the joining user the complete authoritative state (text + Yjs binary)
       socket.emit("room:joined", { roomCode: rawCode, state: snapshot, presence });
+
+      // Send isolated whiteboard state for this room
+      socket.emit("whiteboard:state", {
+        roomCode: rawCode,
+        elements: roomStateStore.getWhiteboardElements(rawCode),
+      });
 
       // Legacy presence event for backwards compatibility
       socket.emit("room-update", {
@@ -474,6 +493,177 @@ function createSocketHandler(httpServer, options) {
       members: presence.map((p) => p.userName),
       room: roomCode,
     });
+  }
+
+  /**
+   * Synchronizes full whiteboard state for the socket's authorized room.
+   */
+  async function handleWhiteboardSync(socket) {
+    try {
+      if (!checkSocketRateLimit(socket, "wb_sync", 10, 10000)) {
+        return socket.emit("whiteboard:error", { message: "Whiteboard sync rate limit exceeded." });
+      }
+
+      const roomCode = socket.currentRoom;
+      if (!roomCode) {
+        return socket.emit("whiteboard:error", { message: "You are not in a room." });
+      }
+
+      const isMember = await roomService.isParticipant(roomCode, socket.userId);
+      if (!isMember) {
+        return socket.emit("whiteboard:error", { message: "Access denied to room whiteboard." });
+      }
+
+      socket.emit("whiteboard:state", {
+        roomCode,
+        elements: roomStateStore.getWhiteboardElements(roomCode),
+      });
+    } catch (err) {
+      logger.error("SOCKET", "handleWhiteboardSync error:", err);
+      socket.emit("whiteboard:error", { message: "Failed to synchronize whiteboard." });
+    }
+  }
+
+  /**
+   * Validates and persists a whiteboard element add/update, then broadcasts to room peers.
+   */
+  function handleWhiteboardUpsert(socket, payload, eventName) {
+    try {
+      if (roomStateStore.isShuttingDown()) {
+        return socket.emit("whiteboard:error", { message: "Server is shutting down. Whiteboard edits are locked." });
+      }
+
+      if (!checkSocketRateLimit(socket, "wb_commit", 60, 5000)) {
+        return socket.emit("whiteboard:error", { message: "Whiteboard update rate limit exceeded." });
+      }
+
+      const roomCode = socket.currentRoom;
+      if (!roomCode) {
+        return socket.emit("whiteboard:error", { message: "You are not in a room." });
+      }
+
+      const rawElement = payload?.element ?? payload;
+      const result = validateWhiteboardElement(rawElement, {
+        userId: socket.userId,
+        userName: socket.userName,
+      });
+
+      if (!result.valid) {
+        return socket.emit("whiteboard:error", { message: result.error });
+      }
+
+      const stored = roomStateStore.upsertWhiteboardElement(
+        roomCode,
+        result.element,
+        MAX_ELEMENTS_PER_ROOM
+      );
+
+      if (!stored.ok) {
+        return socket.emit("whiteboard:error", { message: stored.error });
+      }
+
+      socket.to(roomCode).emit(eventName, {
+        element: stored.element,
+        sentBy: socket.userId,
+      });
+    } catch (err) {
+      logger.error("SOCKET", `${eventName} error:`, err);
+    }
+  }
+
+  /**
+   * Deletes a single whiteboard element by ID and broadcasts to room peers.
+   */
+  function handleWhiteboardDelete(socket, payload) {
+    try {
+      if (roomStateStore.isShuttingDown()) {
+        return socket.emit("whiteboard:error", { message: "Server is shutting down." });
+      }
+
+      if (!checkSocketRateLimit(socket, "wb_commit", 60, 5000)) {
+        return socket.emit("whiteboard:error", { message: "Whiteboard delete rate limit exceeded." });
+      }
+
+      const roomCode = socket.currentRoom;
+      if (!roomCode) {
+        return socket.emit("whiteboard:error", { message: "You are not in a room." });
+      }
+
+      const elementId = payload?.elementId;
+      if (!isValidElementId(elementId)) {
+        return socket.emit("whiteboard:error", { message: "Invalid element id." });
+      }
+
+      roomStateStore.deleteWhiteboardElement(roomCode, elementId);
+      socket.to(roomCode).emit("whiteboard:element:delete", {
+        elementId,
+        sentBy: socket.userId,
+      });
+    } catch (err) {
+      logger.error("SOCKET", "handleWhiteboardDelete error:", err);
+    }
+  }
+
+  /**
+   * Broadcasts ephemeral live-drawing preview to room peers without persisting.
+   */
+  function handleWhiteboardPreview(socket, payload) {
+    try {
+      if (!checkSocketRateLimit(socket, "wb_preview", 150, 5000)) {
+        return; // Silently drop excess ephemeral preview frames
+      }
+
+      const roomCode = socket.currentRoom;
+      if (!roomCode) {
+        return socket.emit("whiteboard:error", { message: "You are not in a room." });
+      }
+
+      const rawElement = payload?.element ?? payload;
+      const result = validateWhiteboardElement(rawElement, {
+        userId: socket.userId,
+        userName: socket.userName,
+      });
+
+      if (!result.valid) {
+        return socket.emit("whiteboard:error", { message: result.error });
+      }
+
+      socket.to(roomCode).emit("whiteboard:preview", {
+        element: result.element,
+        sentBy: socket.userId,
+        senderName: socket.userName,
+      });
+    } catch (err) {
+      logger.error("SOCKET", "handleWhiteboardPreview error:", err);
+    }
+  }
+
+  /**
+   * Clears the room's whiteboard state and notifies peers.
+   */
+  function handleWhiteboardClear(socket) {
+    try {
+      if (roomStateStore.isShuttingDown()) {
+        return socket.emit("whiteboard:error", { message: "Server is shutting down." });
+      }
+
+      if (!checkSocketRateLimit(socket, "wb_clear", 5, 10000)) {
+        return socket.emit("whiteboard:error", { message: "Whiteboard clear rate limit exceeded." });
+      }
+
+      const roomCode = socket.currentRoom;
+      if (!roomCode) {
+        return socket.emit("whiteboard:error", { message: "You are not in a room." });
+      }
+
+      roomStateStore.clearWhiteboard(roomCode);
+      socket.to(roomCode).emit("whiteboard:clear", {
+        clearedBy: socket.userId,
+        clearedByName: socket.userName,
+      });
+    } catch (err) {
+      logger.error("SOCKET", "handleWhiteboardClear error:", err);
+    }
   }
 
   return io;
